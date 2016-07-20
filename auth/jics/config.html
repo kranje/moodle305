@@ -1,0 +1,427 @@
+<?php
+require_once '../config.php';
+global $CFG;
+
+require_once "{$CFG->libdir}/outputcomponents.php";
+require_once "{$CFG->dirroot}/auth/jics/lib/auth_jics_lib.php"; // adaptation of /lib/ldaplib.php
+require_once "{$CFG->dirroot}/local/jics/jics_lib.php"; 
+
+// 2014-02-24 Support suspending user if disabled in AD LDS
+// NOTE: service contract required for cansuspendifdisabled
+if (isset($config->cansuspendifdisabled) &&  
+	$config->cansuspendifdisabled == '1' &&
+	!isset($config->suspendifdisabled)) {
+		$config->suspendifdisabled = '1'; 
+}
+
+
+
+
+
+// 2013-09-17 Support username updating
+if (!isset($config->lockusername))
+	{ $config->lockusername= '1'; }
+
+// Set to defaults if undefined
+// Active Directory support
+if (!isset($config->host_url_AD)) 
+	{$config->host_url_AD = ''; }
+if (!isset($config->host_dn_AD)) 
+	{$config->host_dn_AD = ''; }
+	
+// bulk upload settings
+if (!isset($config->upload_suspend_maxtime))
+	{ $config->upload_suspend_maxtime= 'false'; }
+if (!isset($config->cron))
+	{ $config->cron= '86400'; }
+if (!isset($config->debug_trace))
+	{ $config->debug_trace= '0'; }
+if (!isset($config->lastmodtime))
+	{ $config->lastmodtime= '0'; }
+if (!isset($config->nodirectlogins))
+    { $config->nodirectlogins= '0'; }
+if (!isset($config->upload_mode))
+	{ $config->upload_mode= 'quick'; }
+if (!isset($config->upload_lastmodfilter))
+	{ $config->upload_lastmodfilter = 'false'; }
+if (!isset($config->upload_groupfilter))
+	{ $config->upload_groupfilter = 'false'; }
+if (!isset($config->upload_suspendmaxtime))
+	{ $config->upload_suspendmaxtime = 'false'; }
+if (!isset($config->host_url))
+    { $config->host_url = ''; }
+if (empty($config->ldapencoding))
+	{ $config->ldapencoding = 'utf-8'; }
+if (!isset($config->contexts))
+	{ $config->contexts = 'OU=PortalUsers,CN=Portal,O=Jenzabar,C=US'; }
+if (!isset($config->ldapcontexts))
+	{ $config->ldapcontexts = 'cn=users,dc=HOSTNAME,dc=DOMAIN,dc=edu'; }
+if (!isset($config->user_type))
+	{ $config->user_type = 'adlds'; }
+if (!isset($config->user_attribute))
+	{ $config->user_attribute = 'cn'; }
+if (!isset($config->search_sub))
+	{ $config->search_sub = ''; }
+if (!isset($config->opt_deref))
+	{ $config->opt_deref = LDAP_DEREF_NEVER; }
+if (!isset($config->preventpassindb))
+	{ $config->preventpassindb = 1; }
+if (!isset($config->bind_dn))
+	{$config->bind_dn = 'cn=HighPrivs,ou=PortalUsers,cn=Portal,o=Jenzabar,c=US'; }
+if (!isset($config->bind_pw))
+	{$config->bind_pw = ''; }
+if (!isset($config->ldap_version))
+	{$config->ldap_version = '3'; }
+if (!isset($config->objectclass))
+	{$config->objectclass = 'jenzabar-ICSNET-PortalUser'; }
+if (!isset($config->memberattribute))
+	{$config->memberattribute = 'member'; }
+if (!isset($config->memberattribute_isdn))
+	{$config->memberattribute_isdn = ''; }
+if (!isset($config->passtype)) 
+	{$config->passtype = 'sha1';}
+if (!isset($config->removeuser))
+	{$config->removeuser = '0'; }
+	
+if (!isset($config->additionalRole))
+	{$config->additionalRole = ''; }	
+
+$yesno = array( get_string('no'), get_string('yes') );
+$yes = array( get_string('yes') );
+
+if (!function_exists('ldap_connect')) { // Is ldap really there?
+    notify(get_string('auth_jics_noextension','auth_jics'));
+}
+
+?>
+<table cellspacing="0" cellpadding="5" border="0">
+<tr>
+   <td colspan="2">
+        <h4><?php print_string('auth_jics_general_settings', 'auth_jics') ?> </h4>
+   </td>
+</tr>
+<tr valign="top">
+    <td align="right"><label for="suspendifdisabledsetting"><?php if ( isset($config->cansuspendifdisabled) && $config->cansuspendifdisabled == 1) { print_string('auth_jics_suspendifdisabled_key','auth_jics'); } ?></label></td>
+    <td>
+    <?php if (isset($config->cansuspendifdisabled) && $config->cansuspendifdisabled == '1') { echo html_writer::select($yesno, 'suspendifdisabled', $config->suspendifdisabled, false); }?>
+    </td>
+    <td>
+    <?php if (isset($config->cansuspendifdisabled) && $config->cansuspendifdisabled == '1') { print_string('auth_jics_suspendifdisabled','auth_jics') ; } ?>
+    </td>
+</tr>
+
+<tr>
+	<td align="right"><label for="additionalRole"><?php print_string('auth_jics_additionalRole_txt','auth_jics') ?></label></td>
+    <td>
+        <input name="additionalRole" id="additionalRole" type="text" size="30" value="<?php echo $config->additionalRole?>" />
+    <?php  if (isset($err['additionalRole'])) formerr($err['additionalRole']); ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_additionalRole_txt','auth_jics') ?>
+    </td>
+</tr>
+
+<tr valign="top">
+    <td align="right"><label for="lockusernamesetting"><?php if ($config->canunlockusername == 1) { print_string('auth_jics_lockusername_key','auth_jics'); } ?></label></td>
+    <td>
+    <?php if (isset($config->canunlockusername) && $config->canunlockusername == '1') { echo html_writer::select($yesno, 'lockusername', $config->lockusername, false); }
+	//else { echo html_writer::select($yes, 'lockusername', $config->lockusername, false); }
+	?>
+    </td>
+    <td>
+    <?php if (isset($config->canunlockusername) && $config->canunlockusername == '1') { print_string('auth_jics_lockusername','auth_jics') ; } ?>
+    </td>
+</tr>
+
+<tr valign="top">
+    <td align="right"><label for="menudebugmodesettings"><?php print_string('auth_jics_debug_trace_key','auth_jics') ?></label></td>
+    <td>
+    <?php 
+		echo html_writer::select($yesno, 'debug_trace', $config->debug_trace, false); 
+    ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_debug_trace','auth_jics') ?>
+    </td>
+</tr>
+<tr valign="top">
+    <td align="right"><label for="preventpassindb"><?php print_string('auth_jics_preventpassindb_key','auth_jics') ?></label></td>
+    <td>
+    <?php 
+		echo html_writer::select($yesno, 'preventpassindb', $config->debug_trace, false); 
+    ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_preventpassindb','auth_jics') ?>
+    </td>
+</tr>
+<tr valign="top">
+    <td align="right"><label for="menunodirectloginssettings"><?php print_string('auth_jics_nodirectlogins_key','auth_jics') ?></label></td>
+    <td>
+    <?php 
+        echo html_writer::select($yesno, 'nodirectlogins', $config->nodirectlogins, false); 
+    ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_nodirectlogins','auth_jics') ?>
+    </td>
+</tr>
+<tr valign="top" class="required">
+    <td align="right"><label for="menuuser_type"><?php print_string('auth_jics_user_type_key','auth_jics') ?></label></td>
+    <td>
+    <?php echo html_writer::select(jics_supported_usertypes(), 'user_type', $config->user_type, false); ?>
+    <?php  if (isset($err['user_type'])) formerr($err['user_type']); ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_user_type', 'auth_jics') ?>
+    </td>
+</tr>
+<tr valign="top" class="required">
+    <td align="right"><label for="host_url"><?php print_string('auth_jics_host_url_key','auth_jics') ?></label></td>
+    <td>
+        <input name="host_url" id="host_url" type="text" size="30" value="<?php echo $config->host_url?>" />
+    <?php  if (isset($err['host_url'])) formerr($err['host_url']); ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_host_url','auth_jics') ?>
+    </td>
+</tr>
+
+<tr valign="top" class="required">
+    <td align="right"><label for="contexts"><?php print_string('auth_jics_contexts_key','auth_jics') ?></label></td>
+    <td>
+    <input name="contexts" id="contexts"  type="text" size="30" value="<?php echo $config->contexts?>" />
+    <?php  if (isset($err['contexts'])) formerr($err['contexts']); ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_contexts', 'auth_jics') ?>
+    </td>
+</tr>
+
+
+<tr valign="top" class="required">
+    <td align="right"><label for="memberattribute"><?php print_string('auth_jics_memberattribute_key','auth_jics') ?></label></td>
+    <td>
+    <input name="memberattribute" id="memberattribute"  type="text" size="30" value="<?php echo $config->memberattribute?>" />
+    <?php  if (isset($err['memberattribute'])) formerr($err['memberattribute']); ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_memberattribute', 'auth_jics') ?>
+    </td>
+</tr>
+
+<tr valign="top" class="required">
+    <td align="right"><label for="ldapcontexts"><?php print_string('auth_jics_ldapcontexts_key','auth_jics') ?></label></td>
+    <td>
+    <input name="ldapcontexts" id="ldapcontexts"  type="text" size="30" value="<?php echo $config->ldapcontexts?>" />
+    <?php  if (isset($err['ldapcontexts'])) formerr($err['ldapcontexts']); ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_ldapcontexts', 'auth_jics') ?>
+    </td>
+</tr>
+<tr valign="top" class="required">
+    <td align="right"><label for="host_url_AD"><?php print_string('auth_jics_host_url_key_AD','auth_jics') ?></label></td>
+    <td>
+        <input name="host_url_AD" id="host_url_AD" type="text" size="30" value="<?php echo $config->host_url_AD?>" />
+    <?php  if (isset($err['host_url'])) formerr($err['host_url']); ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_host_url_AD','auth_jics') ?>
+    </td>
+</tr>
+
+<tr valign="top" class="required">
+    <td align="right"><label for="menuldapversion"><?php print_string('auth_jics_ldap_version_key','auth_jics') ?></label></td>
+    <td>
+    <?php
+		$versions = array();
+        $versions['2'] = '2';
+        $versions['3'] = '3';
+        echo html_writer::select($versions, 'ldap_version', $config->ldap_version, false);
+    ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_ldap_version','auth_jics') ?>
+    </td>
+</tr>
+
+<tr valign="top" class="required">
+    <td align="right"><label for="ldapencoding"><?php print_string("auth_jics_ldap_encoding_key", "auth_jics") ?></label></td>
+    <td>
+        <input id="ldapencoding" name="ldapencoding" type="text" value="<?php echo $config->ldapencoding ?>" />
+        <?php
+
+        if (isset($err['ldapencoding'])) {
+            formerr($err['ldapencoding']);
+        }
+
+        ?>
+    </td>
+    <td><?php print_string('auth_jics_ldap_encoding', 'auth_jics') ?></td>
+</tr>
+<tr>
+   <td colspan="2">
+        <h4><?php print_string('auth_jics_bind_settings', 'auth_jics') ?> </h4>
+   </td>
+</tr>
+
+
+<tr valign="top" class="required">
+    <td align="right"><label for="bind_dn"><?php print_string('auth_jics_bind_dn_key','auth_jics') ?></label></td>
+    <td>
+    <input name="bind_dn" id="bind_dn" type="text" size="30" value="<?php echo $config->bind_dn?>" />
+    <?php  if (isset($err['bind_dn'])) formerr($err['bind_dn']); ?>
+    </td><td>
+    <?php print_string('auth_jics_bind_dn','auth_jics') ?>
+    </td>
+</tr>
+
+<tr valign="top" class="required">
+    <td align="right"><label for="bind_pw"><?php print_string('auth_jics_bind_pw_key','auth_jics') ?></label></td>
+    <td>
+    <input name="bind_pw" id="bind_pw" type="password" size="30" value="<?php echo $config->bind_pw?>" />
+    <?php  if (isset($err['bind_pw'])) formerr($err['bind_pw']); ?>
+    </td><td>
+    <?php print_string('auth_jics_bind_pw','auth_jics') ?>
+    </td>
+</tr>
+
+
+
+
+<tr>
+   <td colspan="2">
+        <h4><?php print_string('auth_jics_upload_settings', 'auth_jics') ?> </h4>
+   </td>
+</tr>
+<tr valign="top">
+    <td align="right"><label for="menudcronsettings"><?php print_string('auth_jics_cron_key','auth_jics') ?></label></td>
+    <td>
+        <input name="cron" id="cron" type="text" size="4" value="<?php echo $config->cron?>" />
+    <?php  if (isset($err['cron'])) formerr($err['cron']); ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_cron','auth_jics') ?>
+    </td>
+</tr>
+<tr valign="top">
+    <td align="right"><label for="menuuploadmodesettings"><?php print_string('auth_jics_upload_mode_key','auth_jics') ?></label></td>
+    <td>
+    <?php
+       $uploadmodeopt = array();
+       $uploadmodeopt['quick'] = get_string('auth_jics_upload_mode_quick','auth_jics');
+       $uploadmodeopt['full'] = get_string('auth_jics_upload_mode_full','auth_jics');
+       $uploadmodeopt['none'] = get_string('auth_jics_upload_mode_none','auth_jics');
+       echo html_writer::select($uploadmodeopt, 'upload_mode', $config->upload_mode, false);
+    ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_upload_mode','auth_jics') ?>
+    </td>
+</tr>
+<tr valign="top">
+    <td align="right"><label for="menuuploadgroupsettings"><?php print_string('auth_jics_upload_groupfilter_key','auth_jics') ?></label></td>
+    <td>
+    <?php
+       $uploadgroupfilteropt = array();
+       $uploadgroupfilteropt['Students,Faculty'] = get_string('auth_jics_upload_groupfilter_stufac','auth_jics');
+       $uploadgroupfilteropt['Students'] = get_string('auth_jics_upload_groupfilter_stu','auth_jics');
+       $uploadgroupfilteropt['Faculty'] = get_string('auth_jics_upload_groupfilter_fac','auth_jics');
+	   $uploadgroupfilteropt['Staff'] = get_string('auth_jics_upload_groupfilter_staff','auth_jics');
+	   $uploadgroupfilteropt['Users'] = get_string('auth_jics_upload_groupfilter_all','auth_jics');
+       echo html_writer::select($uploadgroupfilteropt, 'upload_groupfilter', $config->upload_groupfilter, false);
+    ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_upload_groupfilter','auth_jics') ?>
+    </td>
+</tr>
+<tr valign="top">
+    <td align="right"><label for="menuuploadlastmodfiltersettings"><?php print_string('auth_jics_upload_lastmodfilter_key','auth_jics') ?></label></td>
+    <td>
+	<?php
+		echo html_writer::select($yesno, 'upload_lastmodfilter', $config->upload_lastmodfilter, false); 
+    ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_upload_lastmodfilter','auth_jics') ?>
+    </td>
+</tr>
+
+<tr valign="top">
+    <td align="right"><label for="menuuploadsuspendmaxtimesettings"><?php print_string('auth_jics_upload_suspendmaxtime_key','auth_jics') ?></label></td>
+    <td>
+    <?php
+		echo html_writer::select($yesno, 'upload_suspendmaxtime', $config->upload_suspendmaxtime, false); 
+    ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_upload_suspendmaxtime','auth_jics') ?>
+    </td>
+</tr>
+<tr valign="top">
+    <td align="right"><label for="menuremoveuser"><?php print_string('auth_remove_user_key','auth') ?></label></td>
+    <td>
+    <?php
+       $deleteopt = array();
+       $deleteopt['0'] = get_string('auth_remove_keep','auth');
+       $deleteopt['1'] = get_string('auth_remove_suspend','auth');
+       $deleteopt['2'] = get_string('auth_remove_delete','auth');
+       echo html_writer::select($deleteopt, 'removeuser', $config->removeuser, false);
+    ?>
+    </td>
+    <td>
+    <?php print_string('auth_remove_user','auth') ?>
+    </td>
+</tr>
+
+<!--
+<tr>
+   <td colspan="2">
+        <h4><?php print_string('auth_jics_user_settings', 'auth_jics') ?> </h4>
+   </td>
+</tr>
+-->
+
+<!--
+<tr valign="top" class="required">
+    <td align="right"><label for="host_dn_AD"><?php print_string('auth_jics_host_dn_key_AD','auth_jics') ?></label></td>
+    <td>
+        <input name="host_dn_AD" id="host_dn_AD" type="text" size="30" value="<?php echo $config->host_dn_AD?>" />
+    <?php  //if (isset($err['host_dn'])) formerr($err['host_dn']); ?>
+    </td>
+    <td>
+    <?php print_string('auth_jics_host_dn_AD','auth_jics') ?>
+    </td>
+</tr>
+-->
+<!--
+<tr>
+   <td colspan="2">
+        <h4><?php print_string('auth_sync_script', 'auth') ?> </h4>
+   </td>
+</tr>
+-->
+
+<?php
+
+$help  = get_string('auth_ldapextrafields','auth_jics');
+$help .= get_string('auth_updatelocal_expl','auth_jics');
+$help .= get_string('auth_updateremote_expl','auth_jics');
+$help .= get_string('auth_fieldlock_expl','auth_jics');
+$help .= '<hr />';
+
+init_plugin_params();
+// 2014-02-24
+if ($config->suspendifdisabled == 1) {
+	array_push($user_fields,'suspended');
+	//print_r($user_fields);
+}
+//die('Forced exit in config.html line 325');
+
+print_auth_lock_options('jics', $user_fields, $help, true, true); 
+
+?>
+
+</table>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--PLEASE DO NOT MODIFY THIS FILE AND BE AWARE THAT THE FILE CONTAINS CONFIDENTIAL INFORMATION.-->
+<ChemAxon>
+<License>
+<Field Name="Software" Value="Marvin for JavaScript"/>
+<Field Name="License Term" Value="Free Web"/>
+<Field Name="Licensee" Value="Center for Teaching and Learning"/>
+<Field Name="Number of Users" Value="Unlimited"/>
+<Field Name="Expiration Date" Value="2016-09-18"/>
+<Field Name="Support Expiration Date" Value="2016-09-18"/>
+<Field Name="Comment" Value="I recently applied for and received an Academic License for the use of Marvin for our Chemistry module testing in Moodle. After receiving the licensing, I was informed that the Academic licensing didn’t include MarvinJS, which is what we would really like to be using, as the JS applets are much more user friendly on our site.  Therefore, I am requesting a FreeWeb License, which states that it includes MarvinJS as well.&#13;&#10;&#13;&#10; &#13;&#10;&#13;&#10;Thank you and let me know If you need anything else.  Here is the demo site we will be using for testing:  https://courses-test.centre.edu/course/view.php?id=7496&#13;&#10;&#13;&#10;The site is our Learning Management site, but that particular course, the course that will be used, is open to all guests, no login. No registration is required. Anyone going to that page will automatically be taken into the course and have access to materials. "/>
+<Restriction Name="Server Use" Value="Not Allowed"/>
+<Signature Value="MCwCFHzKiPKZY2LElyrde/jCrtTvQyBpAhRRrfNrrhFIHKDgPcycwbD6mH8T8A=="/>
+</License>
+</ChemAxon>
