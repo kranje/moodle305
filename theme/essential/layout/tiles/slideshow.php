@@ -28,24 +28,28 @@ $numberofslides = \theme_essential\toolbox::showslider();
 
 if ($numberofslides) {
     $slideinterval  = \theme_essential\toolbox::get_setting('slideinterval');
-    $data = array('data' => array('slideright' => !$left));
-    if ($slideinterval) {
-        $data['data']['slideinterval'] = $slideinterval;
-    }
+    $data = array('data' => array('slideinterval' => $slideinterval));
     $PAGE->requires->js_call_amd('theme_essential/carousel', 'init', $data);
 
     $captionscenter = (\theme_essential\toolbox::get_setting('slidecaptioncentred')) ? ' centred' : '';
     $captionoptions = \theme_essential\toolbox::get_setting('slidecaptionoptions');
 
     switch($captionoptions) {
+        case 0:
+            if (\theme_essential\toolbox::get_setting('pagebackground')) {
+                $captionsclass = ' pagebackground';
+            } else {
+                $captionsclass = '';
+            }
+        break;
         case 1:
-            $captionsbelowclass = ' ontop';
+            $captionsclass = ' ontop';
         break;
         case 2:
-            $captionsbelowclass = ' below';
+            $captionsclass = ' below';
         break;
         default:
-            $captionsbelowclass = '';
+            $captionsclass = '';
     }
     ?>
     <div class="row-fluid">
@@ -55,20 +59,13 @@ if ($numberofslides) {
                 <ol class="carousel-indicators">
                     <?php echo \theme_essential\toolbox::render_indicators($numberofslides); ?>
                 </ol>
-                <div class="carousel-inner<?php echo $captionscenter.$captionsbelowclass;?>">
-                    <?php
-                    if ($left) {
-                        for ($slideindex = 1; $slideindex <= $numberofslides; $slideindex++) {
-                            echo \theme_essential\toolbox::render_slide($slideindex, $captionoptions);
-                        }
-                    } else {
-                        for ($slideindex = $numberofslides; $slideindex > 0; $slideindex--) {
-                            echo \theme_essential\toolbox::render_slide($slideindex, $captionoptions);
-                        }
-                    }
-                    ?>
+                <div class="carousel-inner<?php echo $captionscenter.$captionsclass;?>">
+                    <?php for ($slideindex = 1; $slideindex <= $numberofslides; $slideindex++) {
+                        echo \theme_essential\toolbox::render_slide($slideindex, $captionoptions);
+}
+?>
                 </div>
-                <?php echo \theme_essential\toolbox::render_slide_controls(); ?>
+                <?php echo \theme_essential\toolbox::render_slide_controls($left); ?>
             </div>
         </div>
     </div>

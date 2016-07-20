@@ -1,30 +1,15 @@
-New in 3.1.0.4
+New in 3.0.1.6
 ==============
-- FIX: Issue #681: Breadcrumbs should be right aligned in RTL mode.
-- FIX: Issue #682: Category icons in M3.1.
-
-New in 3.1.0.3
-==============
-- FIX: SVG version of 'Cogs' for 'Settings' cog.
-- FIX: Plugins check table text colour.
-- FIX: Noticeboard format user picture.
-- NEW: Competancies icon.
-
-New in 3.1.0.2
-==============
-- FIX: Issue #674: M31 beta: Breadcrumbs should be right aligned and flipped in RTL mode.
-- FIX: Issue #675: M31 beta: Left align "return to course" button, in RTL mode.
-- FIX: Issue #676: M31 beta: Tree nodes in Navigation block have no right margin, in RTL mode.
-- FIX: Issue #677: M31b: Tree nodes on Navigation block have redundant 21px right padding, in RTL mode.
-- FIX: Issue #678: Gradebook sticky headers broken, in RTL mode.
 - FIX: Issue #679: Guest user menu show missing support email error.
+- FIX: Issue #686: Two enrolments in a course with latest courses.
+- FIX: Issue #690: Google fonts not working in quiz with Javascript Security.
+- FIX: Issue #691: Cyrillic support for truncated return to section names.  Fixed by Evgeny Logunow.
+- FIX: Issue #692: Page background and 'beside' carousel text clash.
+- FIX: Issue #693: Pixelated user picture.
+- FIX: Issue #695: Large logo, old navbar position and affix.
+- FIX: Issue #696: Double height navbar blocks content.
 - FIX: User menu setting header.
-
-New in 3.1.0.1
-==============
-- FIX: Carousel slides in correct direction for RTL.
-- NEW: Theme table stripe text and background colour settings.
-- NEW: FontAwesome 4.6.3.
+- NEW: My courses options.  Thanks to "Linnaeus University" for funding this enhancement.
 
 New in 3.0.1.5
 ==============

@@ -149,7 +149,7 @@ $string['generalheadingsub'] = 'General settings';
 $string['generalheadingdesc'] = 'Configure the general settings for the theme here.';
 
 $string['pagebackground'] = 'Page background image';
-$string['pagebackgrounddesc'] = 'Upload your own background image. Select the style of the image below.';
+$string['pagebackgrounddesc'] = 'Upload your own background image.  Select the style of the image below.';
 $string['pagebackgroundstyle'] = 'Page background style';
 $string['pagebackgroundstyledesc'] = 'Select the style for the uploaded image.';
 $string['stylefixed'] = 'Fixed';
@@ -181,20 +181,38 @@ $string['contactinfodesc'] = 'Enter your contact information';
 $string['favicon'] = 'Custom favicon';
 $string['favicondesc'] = 'Upload your own favicon.  It should be an .ico file.';
 
-// Custom Menus.
-$string['mycoursesinfo'] = 'Enrolled courses menu';
+// Courses menu.
+$string['mycoursesinfo'] = 'Courses menu';
 $string['mycoursesinfodesc'] = 'Displays a dynamic list of enrolled courses to the user.';
-$string['displaymycourses'] = 'Display enrolled courses';
-$string['displaymycoursesdesc'] = 'Display enrolled courses for users in the \'Custom Menu\'.';
+$string['displaymycourses'] = 'Display courses';
+$string['displaymycoursesdesc'] = 'Display enrolled courses for users on the \'Navbar\'.';
 $string['displayhiddenmycourses'] = 'Display hidden courses';
-$string['displayhiddenmycoursesdesc'] = 'Display hidden courses for users in the \'Custom Menu\' if they have permission to view hidden courses';
+$string['displayhiddenmycoursesdesc'] = 'Display hidden courses for users in the \'Courses menu\' if they have permission to view hidden courses';
+
+$string['mycoursesorder'] = 'Courses order';
+$string['mycoursesorderdesc'] = 'State how the courses should be ordered.  The course sort order can be is set by the core navigation setting \'navsortmycoursessort\'.';
+$string['mycoursesordersort'] = 'Course sort order';
+$string['mycoursesorderid'] = 'Course ID';
+$string['mycoursesorderlast'] = 'Last accessed time or enrolment start time if never accessed';
+$string['mycoursesorderidorder'] = 'Course ID order';
+$string['mycoursesorderidorderdesc'] = 'Course ID order for when \'Course ID\' is set as the \'Course sort order\'.';
+$string['mycoursesorderidasc'] = 'Ascending';
+$string['mycoursesorderiddes'] = 'Descending';
+$string['mycoursesmax'] = 'Max courses';
+$string['mycoursesmaxdesc'] = 'State up to how many courses should be listed between {$a->lower} and {$a->upper} where \'{$a->lower}\' represents all.';
+$string['mycoursesorderenrolbackcolour'] = 'Enrolled and not accessed course background colour';
+$string['mycoursesorderenrolbackcolourdesc'] = 'The background colour for enrolled but not accessed courses.  For ehen \'mycoursesorder\' is set to \'Last accessed...\'.';
 
 $string['mycoursetitle'] = 'Terminology';
-$string['mycoursetitledesc'] = 'Change the terminology for the "My Courses" link in the drop down menu';
+$string['mycoursetitledesc'] = 'Change the terminology for the "My courses" menu title.  When \'mycoursesorder\' is set to \'Last accessed...\' then the word \'latest\' will be added.';
 $string['mycourses'] = 'My courses';
+$string['mylatestcourses'] = 'My latest courses';
 $string['myunits'] = 'My units';
+$string['mylatestunits'] = 'My latest units';
 $string['mymodules'] = 'My modules';
+$string['mylatestmodules'] = 'My latest modules';
 $string['myclasses'] = 'My classes';
+$string['mylatestclasses'] = 'My latest classes';
 $string['allcourses'] = 'All courses';
 $string['allunits'] = 'All units';
 $string['allmodules'] = 'All modules';
@@ -203,6 +221,7 @@ $string['noenrolments'] = 'You have no current enrolments';
 $string['thiscourse'] = 'This course';
 $string['people'] = 'People';
 
+// User menu.
 $string['helplinktype'] = 'Enable help link in menu';
 $string['helplinktypedesc'] = 'Choose whether you want to enable a help option in the user menu, you can choose to either provide an URL that will be opened in a new window or an email address.';
 $string['helplink'] = 'Help link';
@@ -297,10 +316,6 @@ $string['themeiconcolor'] = 'Icon colour';
 $string['themeiconcolordesc'] = 'Set the colour for all icons.';
 $string['themenavcolor'] = 'Navigation text colour';
 $string['themenavcolordesc'] = 'Set the text colour for navigation.  Being the navigation bar and the breadcrumb fancy style.';
-$string['themestripetextcolour'] = 'Stripe text colour';
-$string['themestripetextcolourdesc'] = 'Set the text colour for stripes in tables.';
-$string['themestripebackgroundcolour'] = 'Stripe background colour';
-$string['themestripebackgroundcolourdesc'] = 'Set the background colour for stripes in tables.';
 
 $string['footercolor'] = 'Footer background colour';
 $string['footercolordesc'] = 'Set what colour the background of the Footer box should be.';
@@ -353,10 +368,9 @@ $string['alternativethemenavcolor'] = 'Navigation text colour {$a}';
 $string['alternativethemenavcolordesc'] = 'Set the alternative {$a} text colour for navigation.  Being the navigation bar and the breadcrumb fancy style.';
 $string['alternativethemehovercolor'] = 'Alternative theme hover colour {$a}';
 $string['alternativethemehovercolordesc'] = 'What colour should your theme hovers be for the alternative theme colours {$a}.';
-$string['alternativethemestripetextcolour'] = 'Alternative stripe text colour {$a}';
-$string['alternativethemestripetextcolourdesc'] = 'Set the alternative {$a} text colour for stripes in tables.';
-$string['alternativethemestripebackgroundcolour'] = 'Alternative stripe background colour {$a}';
-$string['alternativethemestripebackgroundcolourdesc'] = 'Set the alternative {$a} background colour for stripes in tables.';
+
+$string['alternativethememycoursesorderenrolbackcolour'] = 'Alternative {$a} enrolled and not accessed course background colour';
+$string['alternativethememycoursesorderenrolbackcolourdesc'] = 'Set alternative {$a} background colour for enrolled but not accessed courses.  For ehen \'mycoursesorder\' is set to \'Last accessed...\'.';
 
 $string['alternativethemefootercolor'] = 'Footer background colour for the alternative theme colours {$a}';
 $string['alternativethemefootercolordesc'] = 'Set what colour the background of the Footer box should be for the alternative theme colours {$a}.';
@@ -407,10 +421,7 @@ $string['frontcontentareadesc'] = 'Whatever is typed into this box will display 
 
 $string['frontpageblocksheading'] = 'Front page blocks';
 $string['frontpageblocks'] = 'Front page blocks alignment';
-$string['frontpageblocksdesc'] = 'Here you can determine if the standard Moodle blocks on the frontpage align before or after the content.';
-$string['beforecontent'] = 'Before content';
-$string['aftercontent'] = 'After content';
-
+$string['frontpageblocksdesc'] = 'Here you can determine if the standard Moodle blocks on the frontpage align to the left or the right.';
 $string['frontpagemiddleblocks'] = 'Enable additional front page middle blocks';
 $string['frontpagemiddleblocksdesc'] = 'If enabled this will display three additional block locations just under the marketing spots.';
 
@@ -570,11 +581,17 @@ $string['websitedesc'] = 'Enter the URL of your own website. (i.e http://about.m
 
 // Category Course Title Image.
 $string['categoryctiheading'] = 'Category course title images';
+$string['categoryctiheadingcs'] = 'Category course title images configuration';
 $string['categoryctiheadingsub'] = 'Use images to represent your categories in a course';
 $string['categoryctidesc'] = 'If enabled this will allow you to set images for each category.';
 
 $string['enablecategorycti'] = 'Enable category course title images';
 $string['enablecategoryctidesc'] = 'If enabled you will be able to select category course title images after clicking "Save changes".';
+
+$string['enablecategoryctics'] = 'Enable category course title image category setting pages';
+$string['enablecategorycticsdesc'] = 'If enabled each top level category will get its own setting page.';
+
+$string['categoryctiheadingcategory'] = 'Category course title images for: {$a->category}';
 
 $string['categoryctiinfo'] = '{$a->category} settings';
 $string['categoryctiinfodesc'] = 'Category course title image settings for: {$a->category}.';

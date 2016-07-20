@@ -37,20 +37,17 @@
                         </a>
                         <?php echo $OUTPUT->get_title('navbar'); ?>
                     <div class="pull-<?php echo ($left) ? 'right' : 'left'; ?>">
-                        <div class="usermenu navbarrightitem">
+                        <div class="usermenu">
                             <?php echo $OUTPUT->custom_menu_user(); ?>
                         </div>
-                        <div class="messagemenu navbarrightitem">
+                        <div class="messagemenu">
                             <?php echo $OUTPUT->custom_menu_messages(); ?>
                         </div>
-                        <div class="navbarrightitem">
+                        <div class="gotobottommenu">
                             <?php echo $OUTPUT->custom_menu_goto_bottom(); ?>
                         </div>
-                        <div id="custom_menu_editing" class="navbarrightitem">
+                        <div id="custom_menu_editing" class="editingmenu">
                             <?php echo $OUTPUT->custom_menu_editing(); ?>
-                        </div>
-                        <div class="navbarrightitem">
-                            <?php echo $OUTPUT->search_box(); ?>
                         </div>
                     </div>
                         <div id='essentialmenus' class="nav-collapse collapse pull-<?php echo ($left) ? 'left' : 'right'; ?>">

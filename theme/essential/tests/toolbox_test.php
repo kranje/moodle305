@@ -137,6 +137,6 @@ class theme_essential_toolbox_testcase extends advanced_testcase {
 
         $this->assertEquals('essential', $PAGE->theme->name);
         $this->assertEquals('/theme/essential', $themedir);
-        $this->assertEquals('bootstrapbase', $PAGE->theme->parents[0]);
+        $this->assertEmpty($PAGE->theme->parents);
     }
 }

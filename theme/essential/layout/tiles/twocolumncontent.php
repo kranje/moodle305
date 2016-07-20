@@ -25,7 +25,7 @@
 
 if ($footerregion) {
     echo '<section id="region-main" class="span12">';
-} else if (($hasboringlayout) && ($left)) {
+} else if ($hasboringlayout) {
     echo '<section id="region-main" class="span9 pull-right">';
 } else {
     echo '<section id="region-main" class="span9">';
@@ -38,7 +38,7 @@ if (empty($PAGE->layout_options['nocoursefooter'])) {
 }
 echo '</section>';
 if (!$footerregion) {
-    if (($hasboringlayout) && ($left)) {
+    if ($hasboringlayout) {
         echo $OUTPUT->blocks('side-pre', 'span3 desktop-first-column');
     } else {
         echo $OUTPUT->blocks('side-pre', 'span3');

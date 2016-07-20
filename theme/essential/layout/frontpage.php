@@ -177,11 +177,7 @@ if ($PAGE->user_is_editing() && ($frontpagemiddleblocks)) {
         <div id="page-content" class="row-fluid">
             <section id="<?php echo $regionbsid; ?>">
 <?php
-$frontpageblocks = \theme_essential\toolbox::get_setting('frontpageblocks');
-if (!$left) {
-    $frontpageblocks = !$frontpageblocks;
-}
-if ($frontpageblocks) {
+if (\theme_essential\toolbox::get_setting('frontpageblocks')) {
     echo '<section id="region-main" class="span9 pull-right">';
 } else {
     echo '<section id="region-main" class="span9 desktop-first-column">';
@@ -190,7 +186,7 @@ echo $OUTPUT->course_content_header();
 echo $OUTPUT->main_content();
 echo $OUTPUT->course_content_footer();
 echo '</section>';
-if ($frontpageblocks) {
+if (\theme_essential\toolbox::get_setting('frontpageblocks')) {
     echo $OUTPUT->blocks('side-pre', 'span3 desktop-first-column');
 } else {
     echo $OUTPUT->blocks('side-pre', 'span3 pull-right');

@@ -20,22 +20,17 @@
         h2#subtitle {
             line-height: 16px;
         }
-    }
-    .dir-ltr #page-header {
         #headerlogo {
             margin-left: 10px;
-        }
-    }
-    .dir-rtl #page-header {
-        #headerlogo {
-            margin-right: 10px;
         }
     }
     .navbar-inner {
         .brand {
             display: none;
         }
+
         .nav-collapse {
+            float: left;
             display: block;
             width: 100%;
             z-index: 10; // Get on top of slider.
@@ -46,6 +41,9 @@
             .navbar-text {
                 padding-left: 15px;
                 padding-right: 15px;
+            }
+            .nav > li {
+                float: left;
             }
             #custom_menu_language,
             #custom_menu_courses,
@@ -66,7 +64,7 @@
                 }
             }
             .nav > li > a {
-                margin-bottom: 0;
+                margin-bottom: 0px;
                 border-radius: 0;
             }
             .nav > li > .dropdown-menu {
@@ -78,6 +76,7 @@
                     border-bottom-color: @dropdownBorder;
                     position: absolute;
                     top: -7px;
+                    left: 9px;
                 }
                 &:after {
                     content: '';
@@ -87,6 +86,7 @@
                     border-bottom: 6px solid @dropdownBackground;
                     position: absolute;
                     top: -6px;
+                    left: 10px;
                 }
             }
             .open > .dropdown-menu {
@@ -95,69 +95,25 @@
             .dropdown-menu {
                 position: absolute;
                 top: 100%;
+                left: 0;
                 z-index: @zindexDropdown;
                 display: none;
+                float: left;
                 border: 1px solid rgba(0, 0, 0, .2);
                 min-width: 160px;
                 padding: 5px 0;
-                .border-radius(@borderRadiusLarge);
-            }
-        }
-    }
-    .dir-ltr .navbar-inner {
-        .nav-collapse {
-            float: left;
-            .nav > li {
-                float: left;
-            }
-            .nav > li > .dropdown-menu {
-                &:before {
-                    left: 9px;
-                }
-                &:after {
-                    left: 10px;
-                }
-            }
-            .dropdown-menu {
-                left: 0;
-                float: left;
-            }
-        }
-    }
-    .dir-rtl .navbar-inner {
-        .nav-collapse {
-            float: right;
-            .nav > li {
-                float: right;
-            }
-            .nav > li > .dropdown-menu {
-                &:before {
-                    right: 9px;
-                }
-                &:after {
-                    right: 10px;
-                }
-            }
-            .dropdown-menu {
-                right: 0;
-                float: right;
+                .border-radius(6px);
             }
         }
     }
 
     #page-message-index {
         #region-main {
+            float: left;
             .message {
                 .contactselector, .messagearea {
                     width: 100%;
                 }
-            }
-        }
-    }
-    .dir-ltr#page-message-index {
-        #region-main {
-            float: left;
-            .message {
                 .messagearea {
                     border-left: transparent;
                 }
@@ -166,21 +122,6 @@
         &.hasboringlayout {
             #region-main {
                 float: right;
-            }
-        }
-    }
-    .dir-rtl#page-message-index {
-        #region-main {
-            float: right;
-            .message {
-                .messagearea {
-                    border-right: transparent;
-                }
-            }
-        }
-        &.hasboringlayout {
-            #region-main {
-                float: left;
             }
         }
     }
@@ -197,11 +138,8 @@
             line-height: 14px;
         }
     }
-    .dir-ltr .row-fluid .desktop-first-column {
+    .row-fluid .desktop-first-column {
         margin-left: 0;
-    }
-    .dir-rtl .row-fluid .desktop-first-column {
-        margin-right: 0;
     }
     #page-mod-quiz-edit ul.slots {
         li.section li.activity .activityinstance {
@@ -219,11 +157,8 @@
         font-weight: 500;
         line-height: 16px;
     }
-    .dir-ltr .row-fluid .desktop-first-column {
+    .row-fluid .desktop-first-column {
         clear: right;
-    }
-    .dir-rtl .row-fluid .desktop-first-column {
-        clear: left;
     }
 
     #page.container-fluid {
@@ -232,6 +167,9 @@
 
     #page-header {
         height: auto;
+        .ecol7 {
+            width: 90%;
+        }
         h1#smalltitle {
             font-size: 1.2em;
             line-height: 14px;
@@ -241,23 +179,13 @@
         }
         #essentialicons {
             overflow: hidden;
+            float: right;
             position: relative;
             top: 0;
+            right: 50px;
         }
         .btn-icon {
             display: block;
-        }
-    }
-    .dir-ltr #page-header {
-        #essentialicons {
-            float: right;
-            right: 50px;
-        }
-    }
-    .dir-rtl #page-header {
-        #essentialicons {
-            float: left;
-            left: 50px;
         }
     }
 
@@ -292,6 +220,9 @@
 
 @media (max-width: 480px) {
     #page-header {
+        .ecol7 {
+            width: 80%;
+        }
         h1#title {
             font-size: 2em;
         }

@@ -34,9 +34,15 @@ echo $OUTPUT->doctype();
     <title><?php echo $OUTPUT->page_title(); ?></title>
     <link rel="shortcut icon" href="<?php echo $OUTPUT->favicon(); ?>"/>
     <?php
+    echo \theme_essential\toolbox::get_csswww();
     echo $OUTPUT->standard_head_html();
     ?>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Google web fonts -->
+    <?php require_once(\theme_essential\toolbox::get_tile_file('fonts')); ?>
+    <!-- Start Analytics -->
+    <?php require_once(\theme_essential\toolbox::get_tile_file('analytics')); ?>
+    <!-- End Analytics -->
 </head>
 
 <body <?php echo $OUTPUT->body_attributes($bodyclasses); ?>>

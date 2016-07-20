@@ -43,16 +43,10 @@ define(['jquery', 'theme_essential/bootstrap', 'core/log'], function($, bootstra
     cycle: function (e) {
       if (!e) this.paused = false
       if (this.interval) clearInterval(this.interval);
-      if (this.options.dirright) {
-        this.options.interval
-          && !this.paused
-          && (this.interval = setInterval($.proxy(this.prev, this), this.options.interval));
-      } else {
-        this.options.interval
-          && !this.paused
-          && (this.interval = setInterval($.proxy(this.next, this), this.options.interval));
-      }
-      return this;
+      this.options.interval
+        && !this.paused
+        && (this.interval = setInterval($.proxy(this.next, this), this.options.interval))
+      return this
     }
 
   , getActiveIndex: function () {
@@ -213,11 +207,10 @@ define(['jquery', 'theme_essential/bootstrap', 'core/log'], function($, bootstra
 
   return {
     init: function(data) {
-      log.debug('Essential carousel AMD init, slide interval: ' + data.slideinterval + ', slideright: ' + data.slideright);
+      log.debug('Essential carousel AMD init, slide interval: ' + data.slideinterval);
       $( document ).ready(function($) {
         $('#essentialCarousel').carousel({
-            interval: data.slideinterval,
-            dirright: data.slideright
+            interval: data.slideinterval
         });
       });
     }
