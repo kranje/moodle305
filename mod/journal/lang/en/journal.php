@@ -1,25 +1,11 @@
-<?php
-// This file is part of Moodle - http://moodle.org/
-//
-// Moodle is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Moodle is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+<?PHP // $Id: journal.php,v 1.1 2011/01/24 11:36:58 davmon Exp $ 
+      // journal.php - created with Moodle 1.7 beta + (2006101003)
 
 $string['eventjournalcreated'] = 'Journal created';
 $string['eventjournalviewed'] = 'Journal viewed';
 $string['evententriesviewed'] = 'Journal entries viewed';
 $string['eventjournaldeleted'] = 'Journal deleted';
 $string['evententryupdated'] = 'Journal entry updated';
-$string['evententrycreated'] = 'Journal entry created';
 $string['eventfeedbackupdated'] = 'Journal feedback updated';
 
 $string['accessdenied'] = 'Access denied';
