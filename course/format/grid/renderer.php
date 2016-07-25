@@ -79,27 +79,6 @@ class format_grid_renderer extends format_section_renderer_base {
     }
 
     /**
-     * Generate the section title, wraps it in a link to the section page if page is to be displayed on a separate page
-     *
-     * @param stdClass $section The course_section entry from DB
-     * @param stdClass $course The course entry from DB
-     * @return string HTML to output.
-     */
-    public function section_title($section, $course) {
-        return $this->render($this->courseformat->inplace_editable_render_section_name($section));
-    }
-    /**
-     * Generate the section title to be displayed on the section page, without a link
-     *
-     * @param stdClass $section The course_section entry from DB
-     * @param stdClass $course The course entry from DB
-     * @return string HTML to output.
-     */
-    public function section_title_without_link($section, $course) {
-        return $this->render($this->courseformat->inplace_editable_render_section_name($section, false));
-    }
-
-    /**
      * Generate next/previous section links for naviation
      *
      * @param stdClass $course The course entry from DB
@@ -842,12 +821,7 @@ class format_grid_renderer extends format_section_renderer_base {
             }
             $sectionstyle .= ' grid_section hide_section';
 
-            $sectionname = $this->courseformat->get_section_name($thissection);
-            if ($editing) {
-                $title = $this->section_title($thissection, $course);
-            } else {
-                $title = $sectionname;
-            }
+            $sectionname = get_section_name($course, $thissection);
             echo html_writer::start_tag('li', array(
                 'id' => 'section-' . $section,
                 'class' => $sectionstyle,
@@ -867,7 +841,7 @@ class format_grid_renderer extends format_section_renderer_base {
             echo html_writer::start_tag('div', array('class' => 'content'));
             if ($hascapvishidsect || ($thissection->visible && $thissection->available)) {
                 // If visible.
-                echo $this->output->heading($title, 3, 'sectionname');
+                echo $this->output->heading($sectionname, 3, 'sectionname');
 
                 echo html_writer::start_tag('div', array('class' => 'summary'));
 

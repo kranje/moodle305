@@ -1,21 +1,5 @@
 ﻿Version Information
 ===================
-Version 3.1.1.2
-  1. Fix toggle operating when editing the section name inline.
-  2. Fix the width of the input box for section name inline editing.
-
-Version 3.1.1.1
-  1. Fix inoperable toggle on iPhone's / iPad's.
-  2. Removed IE8 support.
-
-Version 3.1.1
-  1. First stable version for Moodle 3.1.
-
-Version 3.1.0.1
-  1. Alpha version for Moodle 3.1.
-  2. Refactor to use spans instead of links for the toggle for MDL-51802 as cannot have a link in a link.
-  3. Implement MDL-51802.
-
 Version 3.0.2.1
   1. Put back word-break on section-title.
   2. Change edit summary to edit section on cog icon to be consistent.

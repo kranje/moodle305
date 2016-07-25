@@ -8,24 +8,24 @@ If you find an issue with the format, please see the 'Reporting Issues' section 
 
 Required version of Moodle
 ==========================
-This version works with Moodle 3.1 version 2016052300.00 (Build: 20160523) and above within the 3.1 branch until the
+This version works with Moodle version 2015111600.00 3.0 (Build: 20151116) and above within the 3.0 branch until the
 next release.
 
 Please ensure that your hardware and software complies with 'Requirements' in 'Installing Moodle' on
-'docs.moodle.org/31/en/Installing_Moodle'.
+'docs.moodle.org/30/en/Installing_Moodle'.
 
 Downloads and documentation
 ===========================
 The primary source for downloading this branch of the format is https://moodle.org/plugins/view.php?plugin=format_topcoll
-with 'Select Moodle version:' set at 'Moodle 3.1'.
+with 'Select Moodle version:' set at 'Moodle 3.0'.
 
-The secondary source is a tagged version with the v3.1 prefix on https://github.com/gjb2048/moodle-format_topcoll/tags
+The secondary source is a tagged version with the v3.0 prefix on https://github.com/gjb2048/moodle-format_topcoll/tags
 
 If you download from the development area - https://github.com/gjb2048/moodle-format_topcoll/ - consider that
 the code is unstable and not for use in production environments.  This is because I develop the next version in stages
 and use GitHub as a means of backup.  Therefore the code is not finished, subject to alteration and requires testing.
 
-Documented on http://docs.moodle.org/31/en/Collapsed_Topics_course_format
+Documented on http://docs.moodle.org/30/en/Collapsed_Topics_course_format
 
 Bespoke changes
 ===============
@@ -58,14 +58,9 @@ Flattr - https://flattr.com/profile/gjb2048
 
 Sponsorships may allow me to provide you with more or better features in less time.
 
-Sponsors
-========
-Sponsorships gratefully received with thanks from:
-Emerogork: Central Connecticut State University, USA
-
-New features for this Moodle 3.1 version
+New features for this Moodle 3.0 version
 ========================================
- 1. Features as version 3.0.2.2 in Moodle 3.0 and section name editing as implemented in core by MDL-51802.
+ 1. Same features as version 2.9.1.5 in Moodle 2.9.
 
 Installation
 ============
@@ -198,11 +193,11 @@ If you want to change what icon represents which state / action, then edit 'styl
 the 'background' attribute with a 'toggle-...' type class within them.  There are selectors for both the 'toggles' and
 the 'toggle all' functionality.  For example:
 
-    body.jsenabled .course-content ul.ctopics li.section .content .toggle-arrow span.toggle_closed {
+    body.jsenabled .course-content ul.ctopics li.section .content .toggle-arrow a.toggle_closed {
         background-image: url([[pix:format_topcoll|arrow_right]]);
     }
 
-    #toggle-all .content .toggle-arrow h4 span.off {
+    #toggle-all .content .toggle-arrow h4 a.off {
         background-image: url([[pix:format_topcoll|arrow_down]]); 
     }
 
@@ -225,8 +220,6 @@ Known Issues
     currently experiencing with the MyMobile theme - MDL-33115.  The work around is to refresh the page.  Having altered some
     of the event handing code to operate after page load, I'm hoping that this has now been resolved, please let me know
     if you encounter it.
-4.  If you get HTTP 403 errors on the browsers console for the 'settopcollpref.php' then check that the permissions within the
-    'topcoll' folder are 755 for folders and 644 for files.  Ref: https://moodle.org/mod/forum/discuss.php?d=329620.
 
 Reporting Issues
 ================

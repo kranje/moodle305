@@ -15,27 +15,30 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Collapsed Topics Information
- *
- * A topic based format that solves the issue of the 'Scroll of Death' when a course has many topics. All topics
- * except zero have a toggle that displays that topic. One or more topics can be displayed at any given time.
- * Toggles are persistent on a per browser session per course basis but can be made to persist longer by a small
- * code change. Full installation instructions, code adaptions and credits are included in the 'Readme.txt' file.
+ * Grid Format - A topics based format that uses a grid of user selectable images to popup a light box of the section.
  *
  * @package    course/format
- * @subpackage topcoll
- * @version    See the value of '$plugin->version' in below.
- * @copyright  &copy; 2009-onwards G J Barnard in respect to modifications of standard topics format.
+ * @subpackage grid
+ * @copyright  &copy; 2012 G J Barnard in respect to modifications of standard topics format.
  * @author     G J Barnard - gjbarnard at gmail dot com, {@link http://about.me/gjbarnard} and
  *                           {@link http://moodle.org/user/profile.php?id=442195}
- * @link       http://docs.moodle.org/en/Collapsed_Topics_course_format
- * @license    http://www.gnu.org/copyleft/gpl.html GNU Public License
- *
+ * @author     Based on code originally written by Paul Krix and Julian Ridden.
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version = 2016052302;
+// Plugin version.
+$plugin->version = 2015112105;
+
+// Required Moodle version.
+$plugin->requires = 2015111600.00; // 3.0 (Build: 20151116).
+
+// Full name of the plugin.
+$plugin->component = 'format_grid';
+
+// Software maturity level.
 $plugin->maturity = MATURITY_STABLE;
-$plugin->requires  = 2016052300.00; // 3.1 (Build: 20160523).
-$plugin->component = 'format_topcoll';
-$plugin->release = '3.1.1.2';
+
+// User-friendly version number.
+$plugin->release = '3.0.1.1';

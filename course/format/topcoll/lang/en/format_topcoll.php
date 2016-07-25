@@ -60,13 +60,9 @@ $string['showfromothers'] = 'Show section';
 $string['currentsection'] = 'This section';
 $string['editsection'] = 'Edit section';
 $string['deletesection'] = 'Delete section';
-// These are 'sections' as they are only shown in 'section' based structures.
-$string['markedthissection'] = 'This section is highlighted as the current section';
-$string['markthissection'] = 'Highlight this section as the current section';
-
-// MDL-51802.
-$string['editsectionname'] = 'Edit section name';
-$string['newsectionname'] = 'New name for section {$a}';
+// These are 'topic' as they are only shown in 'topic' based structures.
+$string['markedthissection'] = 'This topic is highlighted as the current topic';
+$string['markthissection'] = 'Highlight this topic as the current topic';
 
 // Reset.
 $string['resetgrp'] = 'Reset:';

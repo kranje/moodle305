@@ -2,24 +2,24 @@ Grid Course Format
 ============================
 A topics based format that uses a grid of user selectable images to pop up a light box of the section.
 
-[![Build Status](https://travis-ci.org/gjb2048/moodle-format_grid.svg?branch=master)](https://travis-ci.org/gjb2048/moodle-format_grid)
+[![Build Status](https://travis-ci.org/gjb2048/moodle-format_grid.svg?branch=MOODLE_30)](https://travis-ci.org/gjb2048/moodle-format_grid)
 
 Required version of Moodle
 ==========================
-This version works with Moodle 3.1 version 2016052300.00 (Build: 20160523) and above within the 3.1 branch until the
+This version works with Moodle version 2015111600.00 3.0 (Build: 20151116) and above within the 3.0 branch until the
 next release.
 
 Please ensure that your hardware and software complies with 'Requirements' in 'Installing Moodle' on
-'docs.moodle.org/31/en/Installing_Moodle'.
+'docs.moodle.org/30/en/Installing_Moodle'.
 
 Free Software
 =============
 The Grid format is 'free' software under the terms of the GNU GPLv3 License, please see 'COPYING.txt'.
 
 The primary source for downloading this branch of the format is https://moodle.org/plugins/view.php?plugin=format_grid
-with 'Select Moodle version:' set at 'Moodle 3.1'.
+with 'Select Moodle version:' set at 'Moodle 3.0'.
 
-The secondary source is a tagged version with the v3.1 prefix on https://github.com/gjb2048/moodle-courseformat_grid/tags
+The secondary source is a tagged version with the v3.0 prefix on https://github.com/gjb2048/moodle-courseformat_grid/tags
 
 If you download from the development area - https://github.com/gjb2048/moodle-courseformat_grid/ - consider that
 the code is unstable and not for use in production environments.  This is because I develop the next version in stages
@@ -253,8 +253,10 @@ Roadmap
 =============
 1. Improved instructions including Moodle docs.
 2. User definable grid row icon numbers - https://moodle.org/mod/forum/discuss.php?d=196716
-3. Continued maintenance of issues.
-4. Ongoing structured walk through and refactoring.
+3. CONTRIB-3240 - Gridview course format more accessible.
+4. Use of crowd funding facility to support development.
+5. Continued maintenance of issues: https://tracker.moodle.org/browse/CONTRIB/component/11231.
+6. Ongoing structured walk through and refactoring.
 
 Known Issues
 =============
