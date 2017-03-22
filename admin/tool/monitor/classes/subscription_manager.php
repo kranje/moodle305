@@ -118,9 +118,10 @@ class subscription_manager {
 
         // If successful trigger a subscription_deleted event.
         if ($success) {
-            if (!empty($subscription->courseid)) {
+            if (!empty($subscription->courseid) &&
+                    ($coursecontext = \context_course::instance($subscription->courseid, IGNORE_MISSING))) {
                 $courseid = $subscription->courseid;
-                $context = \context_course::instance($subscription->courseid);
+                $context = $coursecontext;
             } else {
                 $courseid = 0;
                 $context = \context_system::instance();
@@ -220,6 +221,31 @@ class subscription_manager {
         $subscriptions->close();
 
         return $success;
+    }
+
+    /**
+     * Delete all subscriptions in a course.
+     *
+     * This is called after a course was deleted, context no longer exists but we kept the object
+     *
+     * @param \context_course $coursecontext the context of the course
+     */
+    public static function remove_all_subscriptions_in_course($coursecontext) {
+        global $DB;
+
+        // Store all the subscriptions we have to delete.
+        if ($subscriptions = $DB->get_records('tool_monitor_subscriptions', ['courseid' => $coursecontext->instanceid])) {
+            // Delete subscriptions in bulk.
+            $DB->delete_records('tool_monitor_subscriptions', ['courseid' => $coursecontext->instanceid]);
+
+            // Trigger events one by one.
+            foreach ($subscriptions as $subscription) {
+                $params = ['objectid' => $subscription->id, 'context' => $coursecontext];
+                $event = \tool_monitor\event\subscription_deleted::create($params);
+                $event->add_record_snapshot('tool_monitor_subscriptions', $subscription);
+                $event->trigger();
+            }
+        }
     }
 
     /**
@@ -464,7 +490,7 @@ class subscription_manager {
     /**
      * Activates a group of subscriptions based on an input array of ids.
      *
-     * @since 3.0.5
+     * @since 3.2.0
      * @param array $ids of subscription ids.
      * @return bool true if the operation was successful, false otherwise.
      */
@@ -481,7 +507,7 @@ class subscription_manager {
     /**
      * Deactivates a group of subscriptions based on an input array of ids.
      *
-     * @since 3.0.5
+     * @since 3.2.0
      * @param array $ids of subscription ids.
      * @return bool true if the operation was successful, false otherwise.
      */
@@ -500,7 +526,7 @@ class subscription_manager {
     /**
      * Deletes subscriptions which have been inactive for a period of time.
      *
-     * @since 3.0.5
+     * @since 3.2.0
      * @param int $userid if provided, only this user's stale subscriptions will be deleted.
      * @return bool true if the operation was successful, false otherwise.
      */
@@ -527,7 +553,7 @@ class subscription_manager {
     /**
      * Check whether a subscription is active.
      *
-     * @since 3.0.5
+     * @since 3.2.0
      * @param \tool_monitor\subscription $subscription instance.
      * @return bool true if the subscription is active, false otherwise.
      */

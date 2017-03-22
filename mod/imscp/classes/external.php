@@ -136,14 +136,16 @@ class mod_imscp_external extends external_api {
 
         $params = self::validate_parameters(self::get_imscps_by_courses_parameters(), array('courseids' => $courseids));
 
+        $courses = array();
         if (empty($params['courseids'])) {
-            $params['courseids'] = array_keys(enrol_get_my_courses());
+            $courses = enrol_get_my_courses();
+            $params['courseids'] = array_keys($courses);
         }
 
         // Ensure there are courseids to loop through.
         if (!empty($params['courseids'])) {
 
-            list($courses, $warnings) = external_util::validate_courses($params['courseids']);
+            list($courses, $warnings) = external_util::validate_courses($params['courseids'], $courses);
 
             // Get the imscps in this course, this function checks users visibility permissions.
             // We can avoid then additional validate_context calls.
@@ -163,6 +165,7 @@ class mod_imscp_external extends external_api {
                     // Format intro.
                     list($imscpdetails['intro'], $imscpdetails['introformat']) =
                         external_format_text($imscp->intro, $imscp->introformat, $context->id, 'mod_imscp', 'intro', null);
+                    $imscpdetails['introfiles'] = external_util::get_area_files($context->id, 'mod_imscp', 'intro', false, false);
                 }
 
                 if (has_capability('moodle/course:manageactivities', $context)) {
@@ -202,6 +205,7 @@ class mod_imscp_external extends external_api {
                             'name' => new external_value(PARAM_RAW, 'Activity name'),
                             'intro' => new external_value(PARAM_RAW, 'The IMSCP intro', VALUE_OPTIONAL),
                             'introformat' => new external_format_value('intro', VALUE_OPTIONAL),
+                            'introfiles' => new external_files('Files in the introduction text', VALUE_OPTIONAL),
                             'revision' => new external_value(PARAM_INT, 'Revision', VALUE_OPTIONAL),
                             'keepold' => new external_value(PARAM_INT, 'Number of old IMSCP to keep', VALUE_OPTIONAL),
                             'structure' => new external_value(PARAM_RAW, 'IMSCP structure', VALUE_OPTIONAL),

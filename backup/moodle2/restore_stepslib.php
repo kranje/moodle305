@@ -1793,6 +1793,9 @@ class restore_course_structure_step extends restore_structure_step {
         // Apply for local plugins optional paths at course level
         $this->add_plugin_structure('local', $course);
 
+        // Apply for admin tool plugins optional paths at course level.
+        $this->add_plugin_structure('tool', $course);
+
         return array($course, $category, $tag, $allowed_module);
     }
 
@@ -1867,6 +1870,10 @@ class restore_course_structure_step extends restore_structure_step {
         $this->legacyrestrictmodules = !empty($data->restrictmodules);
 
         $data->startdate= $this->apply_date_offset($data->startdate);
+        if (isset($data->enddate)) {
+            $data->enddate = $this->apply_date_offset($data->enddate);
+        }
+
         if ($data->defaultgroupingid) {
             $data->defaultgroupingid = $this->get_mappingid('grouping', $data->defaultgroupingid);
         }
@@ -1909,22 +1916,8 @@ class restore_course_structure_step extends restore_structure_step {
 
         $data = (object)$data;
 
-        if (!empty($CFG->usetags)) { // if enabled in server
-            // TODO: This is highly inneficient. Each time we add one tag
-            // we fetch all the existing because tag_set() deletes them
-            // so everything must be reinserted on each call
-            $tags = array();
-            $existingtags = tag_get_tags('course', $this->get_courseid());
-            // Re-add all the existitng tags
-            foreach ($existingtags as $existingtag) {
-                $tags[] = $existingtag->rawname;
-            }
-            // Add the one being restored
-            $tags[] = $data->rawname;
-            // Send all the tags back to the course
-            tag_set('course', $this->get_courseid(), $tags, 'core',
-                context_course::instance($this->get_courseid())->id);
-        }
+        core_tag_tag::add_item_tag('core', 'course', $this->get_courseid(),
+                context_course::instance($this->get_courseid()), $data->rawname);
     }
 
     public function process_allowed_module($data) {
@@ -2677,7 +2670,7 @@ class restore_calendarevents_structure_step extends restore_structure_step {
                 'courseid'       => $this->get_courseid(),
                 'groupid'        => $data->groupid,
                 'userid'         => $data->userid,
-                'repeatid'       => $data->repeatid,
+                'repeatid'       => $this->get_mappingid('event', $data->repeatid),
                 'modulename'     => $data->modulename,
                 'eventtype'      => $data->eventtype,
                 'timestart'      => $this->apply_date_offset($data->timestart),
@@ -2695,17 +2688,26 @@ class restore_calendarevents_structure_step extends restore_structure_step {
                   FROM {event}
                  WHERE " . $DB->sql_compare_text('name', 255) . " = " . $DB->sql_compare_text('?', 255) . "
                    AND courseid = ?
-                   AND repeatid = ?
                    AND modulename = ?
                    AND timestart = ?
                    AND timeduration = ?
                    AND " . $DB->sql_compare_text('description', 255) . " = " . $DB->sql_compare_text('?', 255);
-        $arg = array ($params['name'], $params['courseid'], $params['repeatid'], $params['modulename'], $params['timestart'], $params['timeduration'], $params['description']);
+        $arg = array ($params['name'], $params['courseid'], $params['modulename'], $params['timestart'], $params['timeduration'], $params['description']);
         $result = $DB->record_exists_sql($sql, $arg);
         if (empty($result)) {
             $newitemid = $DB->insert_record('event', $params);
             $this->set_mapping('event', $oldid, $newitemid);
             $this->set_mapping('event_description', $oldid, $newitemid, $restorefiles);
+        }
+        // With repeating events, each event has the repeatid pointed at the first occurrence.
+        // Since the repeatid will be empty when the first occurrence is restored,
+        // Get the repeatid from the second occurrence of the repeating event and use that to update the first occurrence.
+        // Then keep a list of repeatids so we only perform this update once.
+        static $repeatids = array();
+        if (!empty($params['repeatid']) && !in_array($params['repeatid'], $repeatids)) {
+            // This entry is repeated so the repeatid field must be set.
+            $DB->set_field('event', 'repeatid', $params['repeatid'], array('id' => $params['repeatid']));
+            $repeatids[] = $params['repeatid'];
         }
 
     }
@@ -3197,6 +3199,227 @@ class restore_course_logstores_structure_step extends restore_structure_step {
 class restore_activity_logstores_structure_step extends restore_course_logstores_structure_step {
 }
 
+/**
+ * Restore course competencies structure step.
+ */
+class restore_course_competencies_structure_step extends restore_structure_step {
+
+    /**
+     * Returns the structure.
+     *
+     * @return array
+     */
+    protected function define_structure() {
+        $userinfo = $this->get_setting_value('users');
+        $paths = array(
+            new restore_path_element('course_competency', '/course_competencies/competencies/competency'),
+            new restore_path_element('course_competency_settings', '/course_competencies/settings'),
+        );
+        if ($userinfo) {
+            $paths[] = new restore_path_element('user_competency_course',
+                '/course_competencies/user_competencies/user_competency');
+        }
+        return $paths;
+    }
+
+    /**
+     * Process a course competency settings.
+     *
+     * @param array $data The data.
+     */
+    public function process_course_competency_settings($data) {
+        global $DB;
+        $data = (object) $data;
+
+        // We do not restore the course settings during merge.
+        $target = $this->get_task()->get_target();
+        if ($target == backup::TARGET_CURRENT_ADDING || $target == backup::TARGET_EXISTING_ADDING) {
+            return;
+        }
+
+        $courseid = $this->task->get_courseid();
+        $exists = \core_competency\course_competency_settings::record_exists_select('courseid = :courseid',
+            array('courseid' => $courseid));
+
+        // Strangely the course settings already exist, let's just leave them as is then.
+        if ($exists) {
+            $this->log('Course competency settings not restored, existing settings have been found.', backup::LOG_WARNING);
+            return;
+        }
+
+        $data = (object) array('courseid' => $courseid, 'pushratingstouserplans' => $data->pushratingstouserplans);
+        $settings = new \core_competency\course_competency_settings(0, $data);
+        $settings->create();
+    }
+
+    /**
+     * Process a course competency.
+     *
+     * @param array $data The data.
+     */
+    public function process_course_competency($data) {
+        $data = (object) $data;
+
+        // Mapping the competency by ID numbers.
+        $framework = \core_competency\competency_framework::get_record(array('idnumber' => $data->frameworkidnumber));
+        if (!$framework) {
+            return;
+        }
+        $competency = \core_competency\competency::get_record(array('idnumber' => $data->idnumber,
+            'competencyframeworkid' => $framework->get_id()));
+        if (!$competency) {
+            return;
+        }
+        $this->set_mapping(\core_competency\competency::TABLE, $data->id, $competency->get_id());
+
+        $params = array(
+            'competencyid' => $competency->get_id(),
+            'courseid' => $this->task->get_courseid()
+        );
+        $query = 'competencyid = :competencyid AND courseid = :courseid';
+        $existing = \core_competency\course_competency::record_exists_select($query, $params);
+
+        if (!$existing) {
+            // Sortorder is ignored by precaution, anyway we should walk through the records in the right order.
+            $record = (object) $params;
+            $record->ruleoutcome = $data->ruleoutcome;
+            $coursecompetency = new \core_competency\course_competency(0, $record);
+            $coursecompetency->create();
+        }
+    }
+
+    /**
+     * Process the user competency course.
+     *
+     * @param array $data The data.
+     */
+    public function process_user_competency_course($data) {
+        global $USER, $DB;
+        $data = (object) $data;
+
+        $data->competencyid = $this->get_mappingid(\core_competency\competency::TABLE, $data->competencyid);
+        if (!$data->competencyid) {
+            // This is strange, the competency does not belong to the course.
+            return;
+        } else if ($data->grade === null) {
+            // We do not need to do anything when there is no grade.
+            return;
+        }
+
+        $data->userid = $this->get_mappingid('user', $data->userid);
+        $shortname = $DB->get_field('course', 'shortname', array('id' => $this->task->get_courseid()), MUST_EXIST);
+
+        // The method add_evidence also sets the course rating.
+        \core_competency\api::add_evidence($data->userid,
+                                           $data->competencyid,
+                                           $this->task->get_contextid(),
+                                           \core_competency\evidence::ACTION_OVERRIDE,
+                                           'evidence_courserestored',
+                                           'core_competency',
+                                           $shortname,
+                                           false,
+                                           null,
+                                           $data->grade,
+                                           $USER->id);
+    }
+
+    /**
+     * Execute conditions.
+     *
+     * @return bool
+     */
+    protected function execute_condition() {
+
+        // Do not execute if competencies are not included.
+        if (!$this->get_setting_value('competencies')) {
+            return false;
+        }
+
+        // Do not execute if the competencies XML file is not found.
+        $fullpath = $this->task->get_taskbasepath();
+        $fullpath = rtrim($fullpath, '/') . '/' . $this->filename;
+        if (!file_exists($fullpath)) {
+            return false;
+        }
+
+        return true;
+    }
+}
+
+/**
+ * Restore activity competencies structure step.
+ */
+class restore_activity_competencies_structure_step extends restore_structure_step {
+
+    /**
+     * Defines the structure.
+     *
+     * @return array
+     */
+    protected function define_structure() {
+        $paths = array(
+            new restore_path_element('course_module_competency', '/course_module_competencies/competencies/competency')
+        );
+        return $paths;
+    }
+
+    /**
+     * Process a course module competency.
+     *
+     * @param array $data The data.
+     */
+    public function process_course_module_competency($data) {
+        $data = (object) $data;
+
+        // Mapping the competency by ID numbers.
+        $framework = \core_competency\competency_framework::get_record(array('idnumber' => $data->frameworkidnumber));
+        if (!$framework) {
+            return;
+        }
+        $competency = \core_competency\competency::get_record(array('idnumber' => $data->idnumber,
+            'competencyframeworkid' => $framework->get_id()));
+        if (!$competency) {
+            return;
+        }
+
+        $params = array(
+            'competencyid' => $competency->get_id(),
+            'cmid' => $this->task->get_moduleid()
+        );
+        $query = 'competencyid = :competencyid AND cmid = :cmid';
+        $existing = \core_competency\course_module_competency::record_exists_select($query, $params);
+
+        if (!$existing) {
+            // Sortorder is ignored by precaution, anyway we should walk through the records in the right order.
+            $record = (object) $params;
+            $record->ruleoutcome = $data->ruleoutcome;
+            $coursemodulecompetency = new \core_competency\course_module_competency(0, $record);
+            $coursemodulecompetency->create();
+        }
+    }
+
+    /**
+     * Execute conditions.
+     *
+     * @return bool
+     */
+    protected function execute_condition() {
+
+        // Do not execute if competencies are not included.
+        if (!$this->get_setting_value('competencies')) {
+            return false;
+        }
+
+        // Do not execute if the competencies XML file is not found.
+        $fullpath = $this->task->get_taskbasepath();
+        $fullpath = rtrim($fullpath, '/') . '/' . $this->filename;
+        if (!file_exists($fullpath)) {
+            return false;
+        }
+
+        return true;
+    }
+}
 
 /**
  * Defines the restore step for advanced grading methods attached to the activity module
@@ -3729,6 +3952,8 @@ class restore_module_structure_step extends restore_structure_step {
             $paths[] = new restore_path_element('availability_field', '/module/availability_info/availability_field');
         }
 
+        $paths[] = new restore_path_element('tag', '/module/tags/tag');
+
         // Apply for 'format' plugins optional paths at module level
         $this->add_plugin_structure('format', $module);
 
@@ -3737,6 +3962,9 @@ class restore_module_structure_step extends restore_structure_step {
 
         // Apply for 'local' plugins optional paths at module level
         $this->add_plugin_structure('local', $module);
+
+        // Apply for 'admin tool' plugins optional paths at module level.
+        $this->add_plugin_structure('tool', $module);
 
         return $paths;
     }
@@ -3837,6 +4065,25 @@ class restore_module_structure_step extends restore_structure_step {
     }
 
     /**
+     * Fetch all the existing because tag_set() deletes them
+     * so everything must be reinserted on each call.
+     *
+     * @param stdClass $data Record data
+     */
+    protected function process_tag($data) {
+        global $CFG;
+
+        $data = (object)$data;
+
+        if (core_tag_tag::is_enabled('core', 'course_modules')) {
+            $modcontext = context::instance_by_id($this->task->get_contextid());
+            $instanceid = $this->task->get_moduleid();
+
+            core_tag_tag::add_item_tag('core', 'course_modules', $instanceid, $modcontext, $data->rawname);
+        }
+    }
+
+    /**
      * Process the legacy availability table record. This table does not exist
      * in Moodle 2.7+ but we still support restore.
      *
@@ -3903,6 +4150,20 @@ class restore_module_structure_step extends restore_structure_step {
             $DB->set_field('course_modules', 'availability', $newvalue,
                     array('id' => $availfield->coursemoduleid));
         }
+    }
+    /**
+     * This method will be executed after the rest of the restore has been processed.
+     *
+     * Update old tag instance itemid(s).
+     */
+    protected function after_restore() {
+        global $DB;
+
+        $contextid = $this->task->get_contextid();
+        $instanceid = $this->task->get_activityid();
+        $olditemid = $this->task->get_old_activityid();
+
+        $DB->set_field('tag_instance', 'itemid', $instanceid, array('contextid' => $contextid, 'itemid' => $olditemid));
     }
 }
 
@@ -4079,6 +4340,14 @@ class restore_create_categories_and_questions extends restore_structure_step {
         }
         $data->contextid = $mapping->parentitemid;
 
+        // Before 3.1, the 'stamp' field could be erroneously duplicated.
+        // From 3.1 onwards, there's a unique index of (contextid, stamp).
+        // If we encounter a duplicate in an old restore file, just generate a new stamp.
+        // This is the same as what happens during an upgrade to 3.1+ anyway.
+        if ($DB->record_exists('question_categories', ['stamp' => $data->stamp, 'contextid' => $data->contextid])) {
+            $data->stamp = make_unique_id_code();
+        }
+
         // Let's create the question_category and save mapping
         $newitemid = $DB->insert_record('question_categories', $data);
         $this->set_mapping('question_category', $oldid, $newitemid);
@@ -4209,25 +4478,17 @@ class restore_create_categories_and_questions extends restore_structure_step {
             return;
         }
 
-        if (!empty($CFG->usetags)) { // if enabled in server
-            // TODO: This is highly inefficient. Each time we add one tag
-            // we fetch all the existing because tag_set() deletes them
-            // so everything must be reinserted on each call
-            $tags = array();
-            $existingtags = tag_get_tags('question', $newquestion);
-            // Re-add all the existitng tags
-            foreach ($existingtags as $existingtag) {
-                $tags[] = $existingtag->rawname;
-            }
-            // Add the one being restored
-            $tags[] = $data->rawname;
+        if (core_tag_tag::is_enabled('core_question', 'question')) {
+            $tagname = $data->rawname;
             // Get the category, so we can then later get the context.
             $categoryid = $this->get_new_parentid('question_category');
             if (empty($this->cachedcategory) || $this->cachedcategory->id != $categoryid) {
                 $this->cachedcategory = $DB->get_record('question_categories', array('id' => $categoryid));
             }
-            // Send all the tags back to the question
-            tag_set('question', $newquestion, $tags, 'core_question', $this->cachedcategory->contextid);
+            // Add the tag to the question.
+            core_tag_tag::add_item_tag('core_question', 'question', $newquestion,
+                    context::instance_by_id($this->cachedcategory->contextid),
+                    $tagname);
         }
     }
 

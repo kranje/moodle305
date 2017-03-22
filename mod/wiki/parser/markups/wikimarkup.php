@@ -194,7 +194,8 @@ abstract class wiki_markup_parser extends generic_parser {
             $text = parser_utils::h('a', "", array('name' => "toc-$num")) . $text;
         }
 
-        return parser_utils::h('h' . $level, $text) . "\n\n";
+        // Display headers as <h3> and lower for accessibility.
+        return parser_utils::h('h' . min(6, $level + 2), $text) . "\n\n";
     }
 
     /**

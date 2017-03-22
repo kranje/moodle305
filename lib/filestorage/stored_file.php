@@ -961,8 +961,9 @@ class stored_file {
      * @param null|string $contenthash if set to null contenthash is not changed
      * @param int $filesize new size of the file
      * @param int $status new status of the file (0 means OK, 666 - source missing)
+     * @param int $timemodified last time modified of the source, if known
      */
-    public function set_synchronized($contenthash, $filesize, $status = 0) {
+    public function set_synchronized($contenthash, $filesize, $status = 0, $timemodified = null) {
         if (!$this->is_external_file()) {
             return;
         }
@@ -974,12 +975,15 @@ class stored_file {
             $oldcontenthash = $this->file_record->contenthash;
         }
         // this will update all entries in {files} that have the same filereference id
-        $this->fs->update_references($this->file_record->referencefileid, $now, null, $contenthash, $filesize, $status);
+        $this->fs->update_references($this->file_record->referencefileid, $now, null, $contenthash, $filesize, $status, $timemodified);
         // we don't need to call update() for this object, just set the values of changed fields
         $this->file_record->contenthash = $contenthash;
         $this->file_record->filesize = $filesize;
         $this->file_record->status = $status;
         $this->file_record->referencelastsync = $now;
+        if ($timemodified) {
+            $this->file_record->timemodified = $timemodified;
+        }
         if (isset($oldcontenthash)) {
             $this->fs->deleted_file_cleanup($oldcontenthash);
         }
@@ -1058,5 +1062,29 @@ class stored_file {
 
         // Generate the thumbnail.
         return generate_image_thumbnail_from_image($original, $imageinfo, $width, $height);
+    }
+
+    /**
+     * Generate a resized image for this stored_file.
+     *
+     * @param int|null $width The desired width, or null to only use the height.
+     * @param int|null $height The desired height, or null to only use the width.
+     * @return string|false False when a problem occurs, else the image data.
+     */
+    public function resize_image($width, $height) {
+        global $CFG;
+        require_once($CFG->libdir . '/gdlib.php');
+
+        // Fetch the image information for this image.
+        $imageinfo = @getimagesizefromstring($this->get_content());
+        if (empty($imageinfo)) {
+            return false;
+        }
+
+        // Create a new image from the file.
+        $original = @imagecreatefromstring($this->get_content());
+
+        // Generate the resized image.
+        return resize_image_from_image($original, $imageinfo, $width, $height);
     }
 }

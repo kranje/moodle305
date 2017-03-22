@@ -16,13 +16,10 @@ Feature: Set a certain number of discussions as a completion condition for a for
       | user | course | role |
       | teacher1 | C1 | editingteacher |
       | student1 | C1 | student |
-    And the following config values are set as admin:
-      | enablecompletion   | 1 |
-      | enableavailability | 1 |
     And I log in as "teacher1"
     And I follow "Course 1"
     And I turn editing mode on
-    And I click on "Edit settings" "link" in the "Administration" "block"
+    And I navigate to "Edit settings" in current page administration
     And I set the following fields to these values:
       | Enable completion tracking | Yes |
     And I press "Save and display"

@@ -16,8 +16,6 @@ Feature: Enable Block Completion in a course using manual self completion
       | user     | course | role           |
       | teacher1 | C1     | editingteacher |
       | student1 | C1     | student        |
-    And the following config values are set as admin:
-      | enablecompletion | 1 |
     And I log in as "teacher1"
     And I follow "Course 1"
     And I turn editing mode on

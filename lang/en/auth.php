@@ -42,16 +42,18 @@ $string['auth_invalidnewemailkey'] = 'Error: if you are trying to confirm a chan
 $string['auth_multiplehosts'] = 'Multiple hosts OR addresses can be specified (eg host1.com;host2.com;host3.com) or (eg xxx.xxx.xxx.xxx;xxx.xxx.xxx.xxx)';
 $string['auth_notconfigured'] = 'The authentication method {$a} is not configured.';
 $string['auth_outofnewemailupdateattempts'] = 'You have run out of allowed attempts to update your email address. Your update request has been cancelled.';
-$string['auth_passwordisexpired'] = 'Your password is expired. Do you want change your password now?';
-$string['auth_passwordwillexpire'] = 'Your password will expire in {$a} days. Do you want change your password now?';
+$string['auth_passwordisexpired'] = 'Your password has expired. Please change it now.';
+$string['auth_passwordwillexpire'] = 'Your password will expire in {$a} days. Do you want to change your password now?';
 $string['auth_remove_delete'] = 'Full delete internal';
 $string['auth_remove_keep'] = 'Keep internal';
 $string['auth_remove_suspend'] = 'Suspend internal';
-$string['auth_remove_user'] = 'Specify what to do with internal user account during mass synchronization when user was removed from external source. Only suspended users are automatically revived if they reappear in ext source.';
+$string['auth_remove_user'] = 'Specify what to do with internal user account during mass synchronisation when user was removed from external source. Only suspended users are automatically restored if they reappear in the external source.';
 $string['auth_remove_user_key'] = 'Removed ext user';
+$string['auth_sync_suspended']  = 'When enabled, the suspended attribute will be used to update the local user account\'s suspension status.';
+$string['auth_sync_suspended_key'] = 'Synchronise local user suspension status';
 $string['auth_sync_script'] = 'User account synchronisation';
 $string['auth_updatelocal'] = 'Update local';
-$string['auth_updatelocal_expl'] = '<p><b>Update local:</b> If enabled, the field will be updated (from external auth) every time the user logs in or there is a user synchronization. Fields set to update locally should be locked.</p>';
+$string['auth_updatelocal_expl'] = '<p><b>Update local:</b> If enabled, the field will be updated (from external auth) every time the user logs in or there is a user synchronisation. Fields set to update locally should be locked.</p>';
 $string['auth_updateremote'] = 'Update external';
 $string['auth_updateremote_expl'] = '<p><b>Update external:</b> If enabled, the external auth will be updated when the user record is updated. Fields should be unlocked to allow edits.</p>';
 $string['auth_updateremote_ldap'] = '<p><b>Note:</b> Updating external LDAP data requires that you set binddn and bindpw to a bind-user with editing privileges to all the user records. It currently does not preserve multi-valued attributes, and will remove extra values on update. </p>';
@@ -60,7 +62,7 @@ $string['auth_user_creation'] = 'New (anonymous) users can create user accounts 
 $string['auth_usernameexists'] = 'Selected username already exists. Please choose a new one.';
 $string['auto_add_remote_users'] = 'Auto add remote users';
 $string['createpassword'] = 'Generate password and notify user';
-$string['createpasswordifneeded'] = 'Create password if needed';
+$string['createpasswordifneeded'] = 'Create password if needed and send via email';
 $string['emailchangecancel'] = 'Cancel email change';
 $string['emailchangepending'] = 'Change pending. Open the link sent to you at {$a->preference_newemail}.';
 $string['emailnowexists'] = 'The email address you tried to assign to your profile has been assigned to someone else since your original request. Your request for change of email address is hereby cancelled, but you may try again with a different address.';
@@ -68,6 +70,8 @@ $string['emailupdate'] = 'Email address update';
 $string['emailupdatemessage'] = 'Dear {$a->fullname},
 
 You have requested a change of your email address for your user account at {$a->site}. Please open the following URL in your browser in order to confirm this change.
+
+If you have any questions please contact support on: {$a->supportemail}
 
 {$a->url}';
 $string['emailupdatesuccess'] = 'Email address of user <em>{$a->fullname}</em> was successfully updated to <em>{$a->email}</em>.';

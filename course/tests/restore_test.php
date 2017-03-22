@@ -38,13 +38,6 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 class core_course_restore_testcase extends advanced_testcase {
 
     /**
-     * Tidy up open files that may be left open.
-     */
-    protected function tearDown() {
-        gc_collect_cycles();
-    }
-
-    /**
      * Backup a course and return its backup ID.
      *
      * @param int $courseid The course ID.

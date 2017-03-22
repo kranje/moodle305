@@ -533,14 +533,52 @@ function scorm_insert_track($userid, $scormid, $scoid, $attempt, $element, $valu
         $track->value = $value;
         $track->timemodified = time();
         $id = $DB->insert_record('scorm_scoes_track', $track);
+        $track->id = $id;
     }
 
-    if (strstr($element, '.score.raw') ||
+    // Trigger updating grades based on a given set of SCORM CMI elements.
+    $scorm = false;
+    if (in_array($element, array('cmi.core.score.raw', 'cmi.score.raw')) ||
         (in_array($element, array('cmi.completion_status', 'cmi.core.lesson_status', 'cmi.success_status'))
          && in_array($track->value, array('completed', 'passed')))) {
         $scorm = $DB->get_record('scorm', array('id' => $scormid));
         include_once($CFG->dirroot.'/mod/scorm/lib.php');
         scorm_update_grades($scorm, $userid);
+    }
+
+    // Trigger CMI element events.
+    if (in_array($element, array('cmi.core.score.raw', 'cmi.score.raw')) ||
+        (in_array($element, array('cmi.completion_status', 'cmi.core.lesson_status', 'cmi.success_status'))
+        && in_array($track->value, array('completed', 'failed', 'passed')))) {
+        if (!$scorm) {
+            $scorm = $DB->get_record('scorm', array('id' => $scormid));
+        }
+        $cm = get_coursemodule_from_instance('scorm', $scormid);
+        $data = array(
+            'other' => array('attemptid' => $attempt, 'cmielement' => $element, 'cmivalue' => $track->value),
+            'objectid' => $scorm->id,
+            'context' => context_module::instance($cm->id),
+            'relateduserid' => $userid
+        );
+        if (in_array($element, array('cmi.core.score.raw', 'cmi.score.raw'))) {
+            // Create score submitted event.
+            $event = \mod_scorm\event\scoreraw_submitted::create($data);
+        } else {
+            // Create status submitted event.
+            $event = \mod_scorm\event\status_submitted::create($data);
+        }
+        // Fix the missing track keys when the SCORM track record already exists, see $trackdata in datamodel.php.
+        // There, for performances reasons, columns are limited to: element, id, value, timemodified.
+        // Missing fields are: userid, scormid, scoid, attempt.
+        $track->userid = $userid;
+        $track->scormid = $scormid;
+        $track->scoid = $scoid;
+        $track->attempt = $attempt;
+        // Trigger submitted event.
+        $event->add_record_snapshot('scorm_scoes_track', $track);
+        $event->add_record_snapshot('course_modules', $cm);
+        $event->add_record_snapshot('scorm', $scorm);
+        $event->trigger();
     }
 
     return $id;
@@ -850,7 +888,7 @@ function scorm_get_all_attempts($scormid, $userid) {
  * @param  stdClass $cm     course module object
  */
 function scorm_print_launch ($user, $scorm, $action, $cm) {
-    global $CFG, $DB, $PAGE, $OUTPUT, $COURSE;
+    global $CFG, $DB, $OUTPUT;
 
     if ($scorm->updatefreq == SCORM_UPDATE_EVERYTIME) {
         scorm_parse($scorm, false);
@@ -859,7 +897,7 @@ function scorm_print_launch ($user, $scorm, $action, $cm) {
     $organization = optional_param('organization', '', PARAM_INT);
 
     if ($scorm->displaycoursestructure == 1) {
-        echo $OUTPUT->box_start('generalbox boxaligncenter toc', 'toc');
+        echo $OUTPUT->box_start('generalbox boxaligncenter toc container', 'toc');
         echo html_writer::div(get_string('contents', 'scorm'), 'structurehead');
     }
     if (empty($organization)) {
@@ -893,6 +931,13 @@ function scorm_print_launch ($user, $scorm, $action, $cm) {
 
     $result = scorm_get_toc($user, $scorm, $cm->id, TOCFULLURL, $orgidentifier);
     $incomplete = $result->incomplete;
+    // Get latest incomplete sco to launch first.
+    if (!empty($result->sco->id)) {
+        $launchsco = $result->sco->id;
+    } else {
+        // Use launch defined by SCORM package.
+        $launchsco = $scorm->launch;
+    }
 
     // Do we want the TOC to be displayed?
     if ($scorm->displaycoursestructure == 1) {
@@ -908,14 +953,17 @@ function scorm_print_launch ($user, $scorm, $action, $cm) {
             echo html_writer::start_div('scorm-center');
             echo html_writer::start_tag('form', array('id' => 'scormviewform',
                                                         'method' => 'post',
-                                                        'action' => $CFG->wwwroot.'/mod/scorm/player.php'));
+                                                        'action' => $CFG->wwwroot.'/mod/scorm/player.php',
+                                                        'class' => 'container'));
         if ($scorm->hidebrowse == 0) {
             print_string('mode', 'scorm');
-            echo ': '.html_writer::empty_tag('input', array('type' => 'radio', 'id' => 'b', 'name' => 'mode', 'value' => 'browse')).
+            echo ': '.html_writer::empty_tag('input', array('type' => 'radio', 'id' => 'b', 'name' => 'mode',
+                    'value' => 'browse', 'class' => 'm-r-1')).
                         html_writer::label(get_string('browse', 'scorm'), 'b');
             echo html_writer::empty_tag('input', array('type' => 'radio',
                                                         'id' => 'n', 'name' => 'mode',
-                                                        'value' => 'normal', 'checked' => 'checked')).
+                                                        'value' => 'normal', 'checked' => 'checked',
+                                                        'class' => 'm-x-1')).
                     html_writer::label(get_string('normal', 'scorm'), 'n');
 
         } else {
@@ -935,10 +983,11 @@ function scorm_print_launch ($user, $scorm, $action, $cm) {
         }
 
         echo html_writer::empty_tag('br');
-        echo html_writer::empty_tag('input', array('type' => 'hidden', 'name' => 'scoid', 'value' => $scorm->launch));
+        echo html_writer::empty_tag('input', array('type' => 'hidden', 'name' => 'scoid', 'value' => $launchsco));
         echo html_writer::empty_tag('input', array('type' => 'hidden', 'name' => 'cm', 'value' => $cm->id));
         echo html_writer::empty_tag('input', array('type' => 'hidden', 'name' => 'currentorg', 'value' => $orgidentifier));
-        echo html_writer::empty_tag('input', array('type' => 'submit', 'value' => get_string('enter', 'scorm')));
+        echo html_writer::empty_tag('input', array('type' => 'submit', 'value' => get_string('enter', 'scorm'),
+                'class' => 'btn btn-primary'));
         echo html_writer::end_tag('form');
         echo html_writer::end_div();
     }
@@ -971,12 +1020,19 @@ function scorm_simple_play($scorm, $user, $context, $cmid) {
         }
         if ($scorm->skipview >= SCORM_SKIPVIEW_FIRST) {
             $sco = current($scoes);
-            $url = new moodle_url('/mod/scorm/player.php', array('a' => $scorm->id,
-                                                                'currentorg' => $orgidentifier,
-                                                                'scoid' => $sco->id));
+            $result = scorm_get_toc($user, $scorm, $cmid, TOCFULLURL, $orgidentifier);
+            $url = new moodle_url('/mod/scorm/player.php', array('a' => $scorm->id, 'currentorg' => $orgidentifier));
+
+            // Set last incomplete sco to launch first.
+            if (!empty($result->sco->id)) {
+                $url->param('scoid', $result->sco->id);
+            } else {
+                $url->param('scoid', $sco->id);
+            }
+
             if ($scorm->skipview == SCORM_SKIPVIEW_ALWAYS || !scorm_has_tracks($scorm->id, $user->id)) {
                 if (!empty($scorm->forcenewattempt)) {
-                    $result = scorm_get_toc($user, $scorm, $cmid, TOCFULLURL, $orgidentifier);
+
                     if ($result->incomplete === false) {
                         $url->param('newattempt', 'on');
                     }
@@ -1480,6 +1536,7 @@ function scorm_get_toc_object($user, $scorm, $currentorg='', $scoid='', $mode='n
 
             if ($sco->isvisible === 'true') {
                 if (!empty($sco->launch)) {
+                    // Set first sco to launch if in browse/review mode.
                     if (empty($scoid) && ($mode != 'normal')) {
                         $scoid = $sco->id;
                     }
@@ -1500,7 +1557,7 @@ function scorm_get_toc_object($user, $scorm, $currentorg='', $scoid='', $mode='n
                                 ($usertrack->status == 'incomplete') ||
                                 ($usertrack->status == 'browsed')) {
                             $incomplete = true;
-                            if ($play && empty($scoid)) {
+                            if (empty($scoid)) {
                                 $scoid = $sco->id;
                             }
                         }
@@ -1519,7 +1576,7 @@ function scorm_get_toc_object($user, $scorm, $currentorg='', $scoid='', $mode='n
                         }
 
                     } else {
-                        if ($play && empty($scoid)) {
+                        if (empty($scoid)) {
                             $scoid = $sco->id;
                         }
 
@@ -1830,7 +1887,7 @@ function scorm_get_toc($user, $scorm, $cmid, $toclink=TOCJSLINK, $currentorg='',
 
     if ($tocheader) {
         $result->toc = html_writer::start_div('yui3-g-r', array('id' => 'scorm_layout'));
-        $result->toc .= html_writer::start_div('yui3-u-1-5', array('id' => 'scorm_toc'));
+        $result->toc .= html_writer::start_div('yui3-u-1-5 loading', array('id' => 'scorm_toc'));
         $result->toc .= html_writer::div('', '', array('id' => 'scorm_toc_title'));
         $result->toc .= html_writer::start_div('', array('id' => 'scorm_tree'));
     }
@@ -1890,7 +1947,7 @@ function scorm_get_toc($user, $scorm, $cmid, $toclink=TOCJSLINK, $currentorg='',
 
     if ($tocheader) {
         $result->toc .= html_writer::end_div().html_writer::end_div();
-        $result->toc .= html_writer::start_div('', array('id' => 'scorm_toc_toggle'));
+        $result->toc .= html_writer::start_div('loading', array('id' => 'scorm_toc_toggle'));
         $result->toc .= html_writer::tag('button', '', array('id' => 'scorm_toc_toggle_btn')).html_writer::end_div();
         $result->toc .= html_writer::start_div('', array('id' => 'scorm_content'));
         $result->toc .= html_writer::div('', '', array('id' => 'scorm_navpanel'));
@@ -2085,4 +2142,220 @@ function scorm_require_available($scorm, $checkviewreportcap = false, $context =
         throw new moodle_exception($reason, 'scorm', '', $warnings[$reason]);
     }
 
+}
+
+/**
+ * Return a SCO object and the SCO launch URL
+ *
+ * @param  stdClass $scorm SCORM object
+ * @param  int $scoid The SCO id in database
+ * @param  stdClass $context context object
+ * @return array the SCO object and URL
+ * @since  Moodle 3.1
+ */
+function scorm_get_sco_and_launch_url($scorm, $scoid, $context) {
+    global $CFG, $DB;
+
+    if (!empty($scoid)) {
+        // Direct SCO request.
+        if ($sco = scorm_get_sco($scoid)) {
+            if ($sco->launch == '') {
+                // Search for the next launchable sco.
+                if ($scoes = $DB->get_records_select(
+                        'scorm_scoes',
+                        'scorm = ? AND '.$DB->sql_isnotempty('scorm_scoes', 'launch', false, true).' AND id > ?',
+                        array($scorm->id, $sco->id),
+                        'sortorder, id')) {
+                    $sco = current($scoes);
+                }
+            }
+        }
+    }
+
+    // If no sco was found get the first of SCORM package.
+    if (!isset($sco)) {
+        $scoes = $DB->get_records_select(
+            'scorm_scoes',
+            'scorm = ? AND '.$DB->sql_isnotempty('scorm_scoes', 'launch', false, true),
+            array($scorm->id),
+            'sortorder, id'
+        );
+        $sco = current($scoes);
+    }
+
+    $connector = '';
+    $version = substr($scorm->version, 0, 4);
+    if ((isset($sco->parameters) && (!empty($sco->parameters))) || ($version == 'AICC')) {
+        if (stripos($sco->launch, '?') !== false) {
+            $connector = '&';
+        } else {
+            $connector = '?';
+        }
+        if ((isset($sco->parameters) && (!empty($sco->parameters))) && ($sco->parameters[0] == '?')) {
+            $sco->parameters = substr($sco->parameters, 1);
+        }
+    }
+
+    if ($version == 'AICC') {
+        require_once("$CFG->dirroot/mod/scorm/datamodels/aicclib.php");
+        $aiccsid = scorm_aicc_get_hacp_session($scorm->id);
+        if (empty($aiccsid)) {
+            $aiccsid = sesskey();
+        }
+        $scoparams = '';
+        if (isset($sco->parameters) && (!empty($sco->parameters))) {
+            $scoparams = '&'. $sco->parameters;
+        }
+        $launcher = $sco->launch.$connector.'aicc_sid='.$aiccsid.'&aicc_url='.$CFG->wwwroot.'/mod/scorm/aicc.php'.$scoparams;
+    } else {
+        if (isset($sco->parameters) && (!empty($sco->parameters))) {
+            $launcher = $sco->launch.$connector.$sco->parameters;
+        } else {
+            $launcher = $sco->launch;
+        }
+    }
+
+    if (scorm_external_link($sco->launch)) {
+        // TODO: does this happen?
+        $scolaunchurl = $launcher;
+    } else if ($scorm->scormtype === SCORM_TYPE_EXTERNAL) {
+        // Remote learning activity.
+        $scolaunchurl = dirname($scorm->reference).'/'.$launcher;
+    } else if ($scorm->scormtype === SCORM_TYPE_LOCAL && strtolower($scorm->reference) == 'imsmanifest.xml') {
+        // This SCORM content sits in a repository that allows relative links.
+        $scolaunchurl = "$CFG->wwwroot/pluginfile.php/$context->id/mod_scorm/imsmanifest/$scorm->revision/$launcher";
+    } else if ($scorm->scormtype === SCORM_TYPE_LOCAL or $scorm->scormtype === SCORM_TYPE_LOCALSYNC) {
+        // Note: do not convert this to use moodle_url().
+        // SCORM does not work without slasharguments and moodle_url() encodes querystring vars.
+        $scolaunchurl = "$CFG->wwwroot/pluginfile.php/$context->id/mod_scorm/content/$scorm->revision/$launcher";
+    }
+    return array($sco, $scolaunchurl);
+}
+
+/**
+ * Trigger the scorm_launched event.
+ *
+ * @param  stdClass $scorm   scorm object
+ * @param  stdClass $sco     sco object
+ * @param  stdClass $cm      course module object
+ * @param  stdClass $context context object
+ * @param  string $scourl    SCO URL
+ * @since Moodle 3.1
+ */
+function scorm_launch_sco($scorm, $sco, $cm, $context, $scourl) {
+
+    $event = \mod_scorm\event\sco_launched::create(array(
+        'objectid' => $sco->id,
+        'context' => $context,
+        'other' => array('instanceid' => $scorm->id, 'loadedcontent' => $scourl)
+    ));
+    $event->add_record_snapshot('course_modules', $cm);
+    $event->add_record_snapshot('scorm', $scorm);
+    $event->add_record_snapshot('scorm_scoes', $sco);
+    $event->trigger();
+}
+
+/**
+ * This is really a little language parser for AICC_SCRIPT
+ * evaluates the expression and returns a boolean answer
+ * see 2.3.2.5.1. Sequencing/Navigation Today  - from the SCORM 1.2 spec (CAM).
+ * Also used by AICC packages.
+ *
+ * @param string $prerequisites the aicc_script prerequisites expression
+ * @param array  $usertracks the tracked user data of each SCO visited
+ * @return boolean
+ */
+function scorm_eval_prerequisites($prerequisites, $usertracks) {
+
+    // This is really a little language parser - AICC_SCRIPT is the reference
+    // see 2.3.2.5.1. Sequencing/Navigation Today  - from the SCORM 1.2 spec.
+    $element = '';
+    $stack = array();
+    $statuses = array(
+        'passed' => 'passed',
+        'completed' => 'completed',
+        'failed' => 'failed',
+        'incomplete' => 'incomplete',
+        'browsed' => 'browsed',
+        'not attempted' => 'notattempted',
+        'p' => 'passed',
+        'c' => 'completed',
+        'f' => 'failed',
+        'i' => 'incomplete',
+        'b' => 'browsed',
+        'n' => 'notattempted'
+    );
+    $i = 0;
+
+    // Expand the amp entities.
+    $prerequisites = preg_replace('/&amp;/', '&', $prerequisites);
+    // Find all my parsable tokens.
+    $prerequisites = preg_replace('/(&|\||\(|\)|\~)/', '\t$1\t', $prerequisites);
+    // Expand operators.
+    $prerequisites = preg_replace('/&/', '&&', $prerequisites);
+    $prerequisites = preg_replace('/\|/', '||', $prerequisites);
+    // Now - grab all the tokens.
+    $elements = explode('\t', trim($prerequisites));
+
+    // Process each token to build an expression to be evaluated.
+    $stack = array();
+    foreach ($elements as $element) {
+        $element = trim($element);
+        if (empty($element)) {
+            continue;
+        }
+        if (!preg_match('/^(&&|\|\||\(|\))$/', $element)) {
+            // Create each individual expression.
+            // Search for ~ = <> X*{} .
+
+            // Sets like 3*{S34, S36, S37, S39}.
+            if (preg_match('/^(\d+)\*\{(.+)\}$/', $element, $matches)) {
+                $repeat = $matches[1];
+                $set = explode(',', $matches[2]);
+                $count = 0;
+                foreach ($set as $setelement) {
+                    if (isset($usertracks[$setelement]) &&
+                        ($usertracks[$setelement]->status == 'completed' || $usertracks[$setelement]->status == 'passed')) {
+                        $count++;
+                    }
+                }
+                if ($count >= $repeat) {
+                    $element = 'true';
+                } else {
+                    $element = 'false';
+                }
+            } else if ($element == '~') {
+                // Not maps ~.
+                $element = '!';
+            } else if (preg_match('/^(.+)(\=|\<\>)(.+)$/', $element, $matches)) {
+                // Other symbols = | <> .
+                $element = trim($matches[1]);
+                if (isset($usertracks[$element])) {
+                    $value = trim(preg_replace('/(\'|\")/', '', $matches[3]));
+                    if (isset($statuses[$value])) {
+                        $value = $statuses[$value];
+                    }
+                    if ($matches[2] == '<>') {
+                        $oper = '!=';
+                    } else {
+                        $oper = '==';
+                    }
+                    $element = '(\''.$usertracks[$element]->status.'\' '.$oper.' \''.$value.'\')';
+                } else {
+                    $element = 'false';
+                }
+            } else {
+                // Everything else must be an element defined like S45 ...
+                if (isset($usertracks[$element]) &&
+                    ($usertracks[$element]->status == 'completed' || $usertracks[$element]->status == 'passed')) {
+                    $element = 'true';
+                } else {
+                    $element = 'false';
+                }
+            }
+
+        }
+        $stack[] = ' '.$element.' ';
+    }
+    return eval('return '.implode($stack).';');
 }

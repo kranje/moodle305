@@ -20,14 +20,16 @@ Feature: The forum search allows users to perform advanced searches for forum po
       | student1 | C1 | student |
     And I log in as "teacher1"
     And I follow "Course 1"
+    And I turn editing mode on
+    And I add the "Latest announcements" block
     And I navigate to "Edit settings" node in "Course administration"
     And I set the field "id_newsitems" to "1"
     And I press "Save and display"
-    And I add a new topic to "News forum" forum with:
+    And I add a new topic to "Announcements" forum with:
       | Subject | My subject |
       | Message | My message |
     And I follow "Course 1"
-    And I add a new topic to "News forum" forum with:
+    And I add a new topic to "Announcements" forum with:
       | Subject | My subjective|
       | Message | My long message |
     And I log out
@@ -35,7 +37,7 @@ Feature: The forum search allows users to perform advanced searches for forum po
   Scenario: Perform an advanced search using any term
     Given I log in as "student1"
     And I follow "Course 1"
-    And I follow "News forum"
+    And I follow "Announcements"
     And I press "Search forums"
     And I should see "Advanced search"
     And I set the field "words" to "subject"
@@ -46,7 +48,7 @@ Feature: The forum search allows users to perform advanced searches for forum po
   Scenario: Perform an advanced search avoiding words
     Given I log in as "student1"
     And I follow "Course 1"
-    And I follow "News forum"
+    And I follow "Announcements"
     And I press "Search forums"
     And I should see "Advanced search"
     And I set the field "words" to "My"
@@ -61,7 +63,7 @@ Feature: The forum search allows users to perform advanced searches for forum po
       | postgres |
     And I log in as "student1"
     And I follow "Course 1"
-    And I follow "News forum"
+    And I follow "Announcements"
     And I press "Search forums"
     And I should see "Advanced search"
     And I set the field "fullwords" to "subject"
@@ -72,7 +74,7 @@ Feature: The forum search allows users to perform advanced searches for forum po
   Scenario: Perform an advanced search matching the subject
     Given I log in as "student1"
     And I follow "Course 1"
-    And I follow "News forum"
+    And I follow "Announcements"
     And I press "Search forums"
     And I should see "Advanced search"
     And I set the field "subject" to "subjective"
@@ -83,13 +85,13 @@ Feature: The forum search allows users to perform advanced searches for forum po
   Scenario: Perform an advanced search matching the author
     Given I log in as "teacher2"
     And I follow "Course 1"
-    And I add a new topic to "News forum" forum with:
+    And I add a new topic to "Announcements" forum with:
       | Subject | My Subjects |
       | Message | My message |
     And I log out
     When I log in as "student1"
     And I follow "Course 1"
-    And I follow "News forum"
+    And I follow "Announcements"
     And I press "Search forums"
     And I should see "Advanced search"
     And I set the field "user" to "TWO"
@@ -100,7 +102,7 @@ Feature: The forum search allows users to perform advanced searches for forum po
   Scenario: Perform an advanced search with multiple words
     Given I log in as "student1"
     And I follow "Course 1"
-    And I follow "News forum"
+    And I follow "Announcements"
     And I press "Search forums"
     And I should see "Advanced search"
     And I set the field "subject" to "my subjective"

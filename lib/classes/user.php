@@ -43,6 +43,21 @@ class core_user {
      */
     const SUPPORT_USER = -20;
 
+    /**
+     * Hide email address from everyone.
+     */
+    const MAILDISPLAY_HIDE = 0;
+
+    /**
+     * Display email address to everyone.
+     */
+    const MAILDISPLAY_EVERYONE = 1;
+
+    /**
+     * Display email address to course members only.
+     */
+    const MAILDISPLAY_COURSE_MEMBERS_ONLY = 2;
+
     /** @var stdClass keep record of noreply user */
     public static $noreplyuser = false;
 
@@ -51,6 +66,9 @@ class core_user {
 
     /** @var array store user fields properties cache. */
     protected static $propertiescache = null;
+
+    /** @var array store user preferences cache. */
+    protected static $preferencescache = null;
 
     /**
      * Return user object from db or create noreply or support user,
@@ -281,12 +299,84 @@ class core_user {
     }
 
     /**
+     * Updates the provided users profile picture based upon the expected fields returned from the edit or edit_advanced forms.
+     *
+     * @param stdClass $usernew An object that contains some information about the user being updated
+     * @param array $filemanageroptions
+     * @return bool True if the user was updated, false if it stayed the same.
+     */
+    public static function update_picture(stdClass $usernew, $filemanageroptions = array()) {
+        global $CFG, $DB;
+        require_once("$CFG->libdir/gdlib.php");
+
+        $context = context_user::instance($usernew->id, MUST_EXIST);
+        $user = core_user::get_user($usernew->id, 'id, picture', MUST_EXIST);
+
+        $newpicture = $user->picture;
+        // Get file_storage to process files.
+        $fs = get_file_storage();
+        if (!empty($usernew->deletepicture)) {
+            // The user has chosen to delete the selected users picture.
+            $fs->delete_area_files($context->id, 'user', 'icon'); // Drop all images in area.
+            $newpicture = 0;
+
+        } else {
+            // Save newly uploaded file, this will avoid context mismatch for newly created users.
+            file_save_draft_area_files($usernew->imagefile, $context->id, 'user', 'newicon', 0, $filemanageroptions);
+            if (($iconfiles = $fs->get_area_files($context->id, 'user', 'newicon')) && count($iconfiles) == 2) {
+                // Get file which was uploaded in draft area.
+                foreach ($iconfiles as $file) {
+                    if (!$file->is_directory()) {
+                        break;
+                    }
+                }
+                // Copy file to temporary location and the send it for processing icon.
+                if ($iconfile = $file->copy_content_to_temp()) {
+                    // There is a new image that has been uploaded.
+                    // Process the new image and set the user to make use of it.
+                    // NOTE: Uploaded images always take over Gravatar.
+                    $newpicture = (int)process_new_icon($context, 'user', 'icon', 0, $iconfile);
+                    // Delete temporary file.
+                    @unlink($iconfile);
+                    // Remove uploaded file.
+                    $fs->delete_area_files($context->id, 'user', 'newicon');
+                } else {
+                    // Something went wrong while creating temp file.
+                    // Remove uploaded file.
+                    $fs->delete_area_files($context->id, 'user', 'newicon');
+                    return false;
+                }
+            }
+        }
+
+        if ($newpicture != $user->picture) {
+            $DB->set_field('user', 'picture', $newpicture, array('id' => $user->id));
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+
+
+    /**
      * Definition of user profile fields and the expected parameter type for data validation.
+     *
+     * array(
+     *     'property_name' => array(       // The user property to be checked. Should match the field on the user table.
+     *          'null' => NULL_ALLOWED,    // Defaults to NULL_NOT_ALLOWED. Takes NULL_NOT_ALLOWED or NULL_ALLOWED.
+     *          'type' => PARAM_TYPE,      // Expected parameter type of the user field.
+     *          'choices' => array(1, 2..) // An array of accepted values of the user field.
+     *          'default' => $CFG->setting // An default value for the field.
+     *     )
+     * )
+     *
+     * The fields choices and default are optional.
      *
      * @return void
      */
     protected static function fill_properties_cache() {
-
+        global $CFG;
         if (self::$propertiescache !== null) {
             return;
         }
@@ -294,60 +384,70 @@ class core_user {
         // Array of user fields properties and expected parameters.
         // Every new field on the user table should be added here otherwise it won't be validated.
         $fields = array();
-        $fields['id'] = array('type' => PARAM_INT);
-        $fields['auth'] = array('type' => PARAM_AUTH);
-        $fields['confirmed'] = array('type' => PARAM_BOOL);
-        $fields['policyagreed'] = array('type' => PARAM_BOOL);
-        $fields['deleted'] = array('type' => PARAM_BOOL);
-        $fields['suspended'] = array('type' => PARAM_BOOL);
-        $fields['mnethostid'] = array('type' => PARAM_INT);
-        $fields['username'] = array('type' => PARAM_USERNAME);
-        $fields['password'] = array('type' => PARAM_RAW);
-        $fields['idnumber'] = array('type' => PARAM_RAW);
-        $fields['firstname'] = array('type' => PARAM_NOTAGS);
-        $fields['lastname'] = array('type' => PARAM_NOTAGS);
-        $fields['surname'] = array('type' => PARAM_NOTAGS);
-        $fields['email'] = array('type' => PARAM_RAW_TRIMMED);
-        $fields['emailstop'] = array('type' => PARAM_INT);
-        $fields['icq'] = array('type' => PARAM_NOTAGS);
-        $fields['skype'] = array('type' => PARAM_NOTAGS);
-        $fields['aim'] = array('type' => PARAM_NOTAGS);
-        $fields['yahoo'] = array('type' => PARAM_NOTAGS);
-        $fields['msn'] = array('type' => PARAM_NOTAGS);
-        $fields['phone1'] = array('type' => PARAM_NOTAGS);
-        $fields['phone2'] = array('type' => PARAM_NOTAGS);
-        $fields['institution'] = array('type' => PARAM_TEXT);
-        $fields['department'] = array('type' => PARAM_TEXT);
-        $fields['address'] = array('type' => PARAM_TEXT);
-        $fields['city'] = array('type' => PARAM_TEXT);
-        $fields['country'] = array('type' => PARAM_ALPHA);
-        $fields['lang'] = array('type' => PARAM_LANG);
-        $fields['calendartype'] = array('type' => PARAM_NOTAGS);
-        $fields['theme'] = array('type' => PARAM_THEME);
-        $fields['timezone'] = array('type' => PARAM_TIMEZONE);
-        $fields['firstaccess'] = array('type' => PARAM_INT);
-        $fields['lastaccess'] = array('type' => PARAM_INT);
-        $fields['lastlogin'] = array('type' => PARAM_INT);
-        $fields['currentlogin'] = array('type' => PARAM_INT);
-        $fields['lastip'] = array('type' => PARAM_NOTAGS);
-        $fields['secret'] = array('type' => PARAM_RAW);
-        $fields['picture'] = array('type' => PARAM_INT);
-        $fields['url'] = array('type' => PARAM_URL);
-        $fields['description'] = array('type' => PARAM_RAW);
-        $fields['descriptionformat'] = array('type' => PARAM_INT);
-        $fields['mailformat'] = array('type' => PARAM_INT);
-        $fields['maildigest'] = array('type' => PARAM_INT);
-        $fields['maildisplay'] = array('type' => PARAM_INT);
-        $fields['autosubscribe'] = array('type' => PARAM_INT);
-        $fields['trackforums'] = array('type' => PARAM_INT);
-        $fields['timecreated'] = array('type' => PARAM_INT);
-        $fields['timemodified'] = array('type' => PARAM_INT);
-        $fields['trustbitmask'] = array('type' => PARAM_INT);
-        $fields['imagealt'] = array('type' => PARAM_TEXT);
-        $fields['lastnamephonetic'] = array('type' => PARAM_NOTAGS);
-        $fields['firstnamephonetic'] = array('type' => PARAM_NOTAGS);
-        $fields['middlename'] = array('type' => PARAM_NOTAGS);
-        $fields['alternatename'] = array('type' => PARAM_NOTAGS);
+        $fields['id'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
+        $fields['auth'] = array('type' => PARAM_AUTH, 'null' => NULL_NOT_ALLOWED);
+        $fields['confirmed'] = array('type' => PARAM_BOOL, 'null' => NULL_NOT_ALLOWED);
+        $fields['policyagreed'] = array('type' => PARAM_BOOL, 'null' => NULL_NOT_ALLOWED);
+        $fields['deleted'] = array('type' => PARAM_BOOL, 'null' => NULL_NOT_ALLOWED);
+        $fields['suspended'] = array('type' => PARAM_BOOL, 'null' => NULL_NOT_ALLOWED);
+        $fields['mnethostid'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
+        $fields['username'] = array('type' => PARAM_USERNAME, 'null' => NULL_NOT_ALLOWED);
+        $fields['password'] = array('type' => PARAM_RAW, 'null' => NULL_NOT_ALLOWED);
+        $fields['idnumber'] = array('type' => PARAM_RAW, 'null' => NULL_NOT_ALLOWED);
+        $fields['firstname'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
+        $fields['lastname'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
+        $fields['surname'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
+        $fields['email'] = array('type' => PARAM_RAW_TRIMMED, 'null' => NULL_NOT_ALLOWED);
+        $fields['emailstop'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
+        $fields['icq'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
+        $fields['skype'] = array('type' => PARAM_NOTAGS, 'null' => NULL_ALLOWED);
+        $fields['aim'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
+        $fields['yahoo'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
+        $fields['msn'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
+        $fields['phone1'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
+        $fields['phone2'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
+        $fields['institution'] = array('type' => PARAM_TEXT, 'null' => NULL_NOT_ALLOWED);
+        $fields['department'] = array('type' => PARAM_TEXT, 'null' => NULL_NOT_ALLOWED);
+        $fields['address'] = array('type' => PARAM_TEXT, 'null' => NULL_NOT_ALLOWED);
+        $fields['city'] = array('type' => PARAM_TEXT, 'null' => NULL_NOT_ALLOWED, 'default' => $CFG->defaultcity);
+        $fields['country'] = array('type' => PARAM_ALPHA, 'null' => NULL_NOT_ALLOWED, 'default' => $CFG->country,
+                'choices' => array_merge(array('' => ''), get_string_manager()->get_list_of_countries(true, true)));
+        $fields['lang'] = array('type' => PARAM_LANG, 'null' => NULL_NOT_ALLOWED, 'default' => $CFG->lang,
+                'choices' => array_merge(array('' => ''), get_string_manager()->get_list_of_translations(false)));
+        $fields['calendartype'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED, 'default' => $CFG->calendartype,
+                'choices' => array_merge(array('' => ''), \core_calendar\type_factory::get_list_of_calendar_types()));
+        $fields['theme'] = array('type' => PARAM_THEME, 'null' => NULL_NOT_ALLOWED,
+                'default' => theme_config::DEFAULT_THEME, 'choices' => array_merge(array('' => ''), get_list_of_themes()));
+        $fields['timezone'] = array('type' => PARAM_TIMEZONE, 'null' => NULL_NOT_ALLOWED,
+                'default' => core_date::get_server_timezone()); // Must not use choices here: timezones can come and go.
+        $fields['firstaccess'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
+        $fields['lastaccess'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
+        $fields['lastlogin'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
+        $fields['currentlogin'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
+        $fields['lastip'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
+        $fields['secret'] = array('type' => PARAM_RAW, 'null' => NULL_NOT_ALLOWED);
+        $fields['picture'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
+        $fields['url'] = array('type' => PARAM_URL, 'null' => NULL_NOT_ALLOWED);
+        $fields['description'] = array('type' => PARAM_RAW, 'null' => NULL_ALLOWED);
+        $fields['descriptionformat'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
+        $fields['mailformat'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED,
+                'default' => $CFG->defaultpreference_mailformat);
+        $fields['maildigest'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED,
+                'default' => $CFG->defaultpreference_maildigest);
+        $fields['maildisplay'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED,
+                'default' => $CFG->defaultpreference_maildisplay);
+        $fields['autosubscribe'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED,
+                'default' => $CFG->defaultpreference_autosubscribe);
+        $fields['trackforums'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED,
+                'default' => $CFG->defaultpreference_trackforums);
+        $fields['timecreated'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
+        $fields['timemodified'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
+        $fields['trustbitmask'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
+        $fields['imagealt'] = array('type' => PARAM_TEXT, 'null' => NULL_ALLOWED);
+        $fields['lastnamephonetic'] = array('type' => PARAM_NOTAGS, 'null' => NULL_ALLOWED);
+        $fields['firstnamephonetic'] = array('type' => PARAM_NOTAGS, 'null' => NULL_ALLOWED);
+        $fields['middlename'] = array('type' => PARAM_NOTAGS, 'null' => NULL_ALLOWED);
+        $fields['alternatename'] = array('type' => PARAM_NOTAGS, 'null' => NULL_ALLOWED);
 
         self::$propertiescache = $fields;
     }
@@ -371,6 +471,37 @@ class core_user {
     }
 
     /**
+     * Validate user data.
+     *
+     * This method just validates each user field and return an array of errors. It doesn't clean the data,
+     * the methods clean() and clean_field() should be used for this purpose.
+     *
+     * @param stdClass|array $data user data object or array to be validated.
+     * @return array|true $errors array of errors found on the user object, true if the validation passed.
+     */
+    public static function validate($data) {
+        // Get all user profile fields definition.
+        self::fill_properties_cache();
+
+        foreach ($data as $property => $value) {
+            try {
+                if (isset(self::$propertiescache[$property])) {
+                    validate_param($value, self::$propertiescache[$property]['type'], self::$propertiescache[$property]['null']);
+                }
+                // Check that the value is part of a list of allowed values.
+                if (!empty(self::$propertiescache[$property]['choices']) &&
+                        !isset(self::$propertiescache[$property]['choices'][$value])) {
+                    throw new invalid_parameter_exception($value);
+                }
+            } catch (invalid_parameter_exception $e) {
+                $errors[$property] = $e->getMessage();
+            }
+        }
+
+        return empty($errors) ? true : $errors;
+    }
+
+    /**
      * Clean the properties cache.
      *
      * During unit tests we need to be able to reset all caches so that each new test starts in a known state.
@@ -378,5 +509,358 @@ class core_user {
      */
     public static function reset_caches() {
         self::$propertiescache = null;
+    }
+
+    /**
+     * Clean the user data.
+     *
+     * @param stdClass|array $user the user data to be validated against properties definition.
+     * @return stdClass $user the cleaned user data.
+     */
+    public static function clean_data($user) {
+        if (empty($user)) {
+            return $user;
+        }
+
+        foreach ($user as $field => $value) {
+            // Get the property parameter type and do the cleaning.
+            try {
+                $user->$field = core_user::clean_field($value, $field);
+            } catch (coding_exception $e) {
+                debugging("The property '$field' could not be cleaned.", DEBUG_DEVELOPER);
+            }
+        }
+
+        return $user;
+    }
+
+    /**
+     * Clean a specific user field.
+     *
+     * @param string $data the user field data to be cleaned.
+     * @param string $field the user field name on the property definition cache.
+     * @return string the cleaned user data.
+     */
+    public static function clean_field($data, $field) {
+        if (empty($data) || empty($field)) {
+            return $data;
+        }
+
+        try {
+            $type = core_user::get_property_type($field);
+
+            if (isset(self::$propertiescache[$field]['choices'])) {
+                if (!array_key_exists($data, self::$propertiescache[$field]['choices'])) {
+                    if (isset(self::$propertiescache[$field]['default'])) {
+                        $data = self::$propertiescache[$field]['default'];
+                    } else {
+                        $data = '';
+                    }
+                } else {
+                    return $data;
+                }
+            } else {
+                $data = clean_param($data, $type);
+            }
+        } catch (coding_exception $e) {
+            debugging("The property '$field' could not be cleaned.", DEBUG_DEVELOPER);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Get the parameter type of the property.
+     *
+     * @param string $property property name to be retrieved.
+     * @throws coding_exception if the requested property name is invalid.
+     * @return int the property parameter type.
+     */
+    public static function get_property_type($property) {
+
+        self::fill_properties_cache();
+
+        if (!array_key_exists($property, self::$propertiescache)) {
+            throw new coding_exception('Invalid property requested: ' . $property);
+        }
+
+        return self::$propertiescache[$property]['type'];
+    }
+
+    /**
+     * Discover if the property is NULL_ALLOWED or NULL_NOT_ALLOWED.
+     *
+     * @param string $property property name to be retrieved.
+     * @throws coding_exception if the requested property name is invalid.
+     * @return bool true if the property is NULL_ALLOWED, false otherwise.
+     */
+    public static function get_property_null($property) {
+
+        self::fill_properties_cache();
+
+        if (!array_key_exists($property, self::$propertiescache)) {
+            throw new coding_exception('Invalid property requested: ' . $property);
+        }
+
+        return self::$propertiescache[$property]['null'];
+    }
+
+    /**
+     * Get the choices of the property.
+     *
+     * This is a helper method to validate a value against a list of acceptable choices.
+     * For instance: country, language, themes and etc.
+     *
+     * @param string $property property name to be retrieved.
+     * @throws coding_exception if the requested property name is invalid or if it does not has a list of choices.
+     * @return array the property parameter type.
+     */
+    public static function get_property_choices($property) {
+
+        self::fill_properties_cache();
+
+        if (!array_key_exists($property, self::$propertiescache) && !array_key_exists('choices',
+                self::$propertiescache[$property])) {
+
+            throw new coding_exception('Invalid property requested, or the property does not has a list of choices.');
+        }
+
+        return self::$propertiescache[$property]['choices'];
+    }
+
+    /**
+     * Get the property default.
+     *
+     * This method gets the default value of a field (if exists).
+     *
+     * @param string $property property name to be retrieved.
+     * @throws coding_exception if the requested property name is invalid or if it does not has a default value.
+     * @return string the property default value.
+     */
+    public static function get_property_default($property) {
+
+        self::fill_properties_cache();
+
+        if (!array_key_exists($property, self::$propertiescache) || !isset(self::$propertiescache[$property]['default'])) {
+            throw new coding_exception('Invalid property requested, or the property does not has a default value.');
+        }
+
+        return self::$propertiescache[$property]['default'];
+    }
+
+    /**
+     * Definition of updateable user preferences and rules for data and access validation.
+     *
+     * array(
+     *     'preferencename' => array(      // Either exact preference name or a regular expression.
+     *          'null' => NULL_ALLOWED,    // Defaults to NULL_NOT_ALLOWED. Takes NULL_NOT_ALLOWED or NULL_ALLOWED.
+     *          'type' => PARAM_TYPE,      // Expected parameter type of the user field - mandatory
+     *          'choices' => array(1, 2..) // An array of accepted values of the user field - optional
+     *          'default' => $CFG->setting // An default value for the field - optional
+     *          'isregex' => false/true    // Whether the name of the preference is a regular expression (default false).
+     *          'permissioncallback' => callable // Function accepting arguments ($user, $preferencename) that checks if current user
+     *                                     // is allowed to modify this preference for given user.
+     *                                     // If not specified core_user::default_preference_permission_check() will be assumed.
+     *          'cleancallback' => callable // Custom callback for cleaning value if something more difficult than just type/choices is needed
+     *                                     // accepts arguments ($value, $preferencename)
+     *     )
+     * )
+     *
+     * @return void
+     */
+    protected static function fill_preferences_cache() {
+        if (self::$preferencescache !== null) {
+            return;
+        }
+
+        // Array of user preferences and expected types/values.
+        // Every preference that can be updated directly by user should be added here.
+        $preferences = array();
+        $preferences['auth_forcepasswordchange'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED, 'choices' => array(0, 1),
+            'permissioncallback' => function($user, $preferencename) {
+                global $USER;
+                $systemcontext = context_system::instance();
+                return ($USER->id != $user->id && (has_capability('moodle/user:update', $systemcontext) ||
+                        ($user->timecreated > time() - 10 && has_capability('moodle/user:create', $systemcontext))));
+            });
+        $preferences['usemodchooser'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED, 'default' => 1,
+            'choices' => array(0, 1));
+        $preferences['forum_markasreadonnotification'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED, 'default' => 1,
+            'choices' => array(0, 1));
+        $preferences['htmleditor'] = array('type' => PARAM_NOTAGS, 'null' => NULL_ALLOWED,
+            'cleancallback' => function($value, $preferencename) {
+                if (empty($value) || !array_key_exists($value, core_component::get_plugin_list('editor'))) {
+                    return null;
+                }
+                return $value;
+            });
+        $preferences['badgeprivacysetting'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED, 'default' => 1,
+            'choices' => array(0, 1), 'permissioncallback' => function($user, $preferencename) {
+                global $CFG, $USER;
+                return !empty($CFG->enablebadges) && $user->id == $USER->id;
+            });
+        $preferences['blogpagesize'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED, 'default' => 10,
+            'permissioncallback' => function($user, $preferencename) {
+                global $USER;
+                return $USER->id == $user->id && has_capability('moodle/blog:view', context_system::instance());
+            });
+
+        // Core components that may want to define their preferences.
+        // List of core components implementing callback is hardcoded here for performance reasons.
+        $corecomponents = ['core_message', 'core_calendar'];
+        foreach ($corecomponents as $component) {
+            if (($pluginpreferences = component_callback($component, 'user_preferences')) && is_array($pluginpreferences)) {
+                $preferences += $pluginpreferences;
+            }
+        }
+
+        // Plugins that may define their preferences.
+        if ($pluginsfunction = get_plugins_with_function('user_preferences')) {
+            foreach ($pluginsfunction as $plugintype => $plugins) {
+                foreach ($plugins as $function) {
+                    if (($pluginpreferences = call_user_func($function)) && is_array($pluginpreferences)) {
+                        $preferences += $pluginpreferences;
+                    }
+                }
+            }
+        }
+
+        self::$preferencescache = $preferences;
+    }
+
+    /**
+     * Retrieves the preference definition
+     *
+     * @param string $preferencename
+     * @return array
+     */
+    protected static function get_preference_definition($preferencename) {
+        self::fill_preferences_cache();
+
+        foreach (self::$preferencescache as $key => $preference) {
+            if (empty($preference['isregex'])) {
+                if ($key === $preferencename) {
+                    return $preference;
+                }
+            } else {
+                if (preg_match($key, $preferencename)) {
+                    return $preference;
+                }
+            }
+        }
+
+        throw new coding_exception('Invalid preference requested.');
+    }
+
+    /**
+     * Default callback used for checking if current user is allowed to change permission of user $user
+     *
+     * @param stdClass $user
+     * @param string $preferencename
+     * @return bool
+     */
+    protected static function default_preference_permission_check($user, $preferencename) {
+        global $USER;
+        if (is_mnet_remote_user($user)) {
+            // Can't edit MNET user.
+            return false;
+        }
+
+        if ($user->id == $USER->id) {
+            // Editing own profile.
+            $systemcontext = context_system::instance();
+            return has_capability('moodle/user:editownprofile', $systemcontext);
+        } else  {
+            // Teachers, parents, etc.
+            $personalcontext = context_user::instance($user->id);
+            if (!has_capability('moodle/user:editprofile', $personalcontext)) {
+                return false;
+            }
+            if (is_siteadmin($user->id) and !is_siteadmin($USER)) {
+                // Only admins may edit other admins.
+                return false;
+            }
+            return true;
+        }
+    }
+
+    /**
+     * Can current user edit preference of this/another user
+     *
+     * @param string $preferencename
+     * @param stdClass $user
+     * @return bool
+     */
+    public static function can_edit_preference($preferencename, $user) {
+        if (!isloggedin() || isguestuser()) {
+            // Guests can not edit anything.
+            return false;
+        }
+
+        try {
+            $definition = self::get_preference_definition($preferencename);
+        } catch (coding_exception $e) {
+            return false;
+        }
+
+        if ($user->deleted || !context_user::instance($user->id, IGNORE_MISSING)) {
+            // User is deleted.
+            return false;
+        }
+
+        if (isset($definition['permissioncallback'])) {
+            $callback = $definition['permissioncallback'];
+            if (is_callable($callback)) {
+                return call_user_func_array($callback, [$user, $preferencename]);
+            } else {
+                throw new coding_exception('Permission callback for preference ' . s($preferencename) . ' is not callable');
+                return false;
+            }
+        } else {
+            return self::default_preference_permission_check($user, $preferencename);
+        }
+    }
+
+    /**
+     * Clean value of a user preference
+     *
+     * @param string $value the user preference value to be cleaned.
+     * @param string $preferencename the user preference name
+     * @return string the cleaned preference value
+     */
+    public static function clean_preference($value, $preferencename) {
+
+        $definition = self::get_preference_definition($preferencename);
+
+        if (isset($definition['type']) && $value !== null) {
+            $value = clean_param($value, $definition['type']);
+        }
+
+        if (isset($definition['cleancallback'])) {
+            $callback = $definition['cleancallback'];
+            if (is_callable($callback)) {
+                return $callback($value, $preferencename);
+            } else {
+                throw new coding_exception('Clean callback for preference ' . s($preferencename) . ' is not callable');
+            }
+        } else if ($value === null && (!isset($definition['null']) || $definition['null'] == NULL_ALLOWED)) {
+            return null;
+        } else if (isset($definition['choices'])) {
+            if (!in_array($value, $definition['choices'])) {
+                if (isset($definition['default'])) {
+                    return $definition['default'];
+                } else {
+                    $first = reset($definition['choices']);
+                    return $first;
+                }
+            } else {
+                return $value;
+            }
+        } else {
+            if ($value === null) {
+                return isset($definition['default']) ? $definition['default'] : '';
+            }
+            return $value;
+        }
     }
 }

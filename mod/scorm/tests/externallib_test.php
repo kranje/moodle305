@@ -172,6 +172,9 @@ class mod_scorm_external_testcase extends externallib_advanced_testcase {
         $this->assertEquals(1, $result['attemptscount']);
     }
 
+    /**
+     * @expectedException required_capability_exception
+     */
     public function test_mod_scorm_get_scorm_attempt_count_others_as_student() {
         // Create a second student.
         $student2 = self::getDataGenerator()->create_user();
@@ -181,24 +184,27 @@ class mod_scorm_external_testcase extends externallib_advanced_testcase {
         self::setUser($student2);
 
         // I should not be able to view the attempts of another student.
-        $this->setExpectedException('required_capability_exception');
         mod_scorm_external::get_scorm_attempt_count($this->scorm->id, $this->student->id);
     }
 
+    /**
+     * @expectedException moodle_exception
+     */
     public function test_mod_scorm_get_scorm_attempt_count_invalid_instanceid() {
         // As student.
         self::setUser($this->student);
 
         // Test invalid instance id.
-        $this->setExpectedException('moodle_exception');
         mod_scorm_external::get_scorm_attempt_count(0, $this->student->id);
     }
 
+    /**
+     * @expectedException moodle_exception
+     */
     public function test_mod_scorm_get_scorm_attempt_count_invalid_userid() {
         // As student.
         self::setUser($this->student);
 
-        $this->setExpectedException('moodle_exception');
         mod_scorm_external::get_scorm_attempt_count($this->scorm->id, -1);
     }
 
@@ -261,12 +267,27 @@ class mod_scorm_external_testcase extends externallib_advanced_testcase {
 
         $scoes = scorm_get_scoes($scorm->id);
         $sco = array_shift($scoes);
+        $sco->extradata = array();
         $this->assertEquals((array) $sco, $result['scoes'][0]);
 
         $sco = array_shift($scoes);
-        // Remove specific sco data.
+        $sco->extradata = array();
+        $sco->extradata[] = array(
+            'element' => 'isvisible',
+            'value' => $sco->isvisible
+        );
+        $sco->extradata[] = array(
+            'element' => 'parameters',
+            'value' => $sco->parameters
+        );
         unset($sco->isvisible);
         unset($sco->parameters);
+
+        // Sort the array (if we don't sort tests will fails for Postgres).
+        usort($result['scoes'][1]['extradata'], function($a, $b) {
+            return strcmp($a['element'], $b['element']);
+        });
+
         $this->assertEquals((array) $sco, $result['scoes'][1]);
 
         // Use organization.
@@ -284,6 +305,47 @@ class mod_scorm_external_testcase extends externallib_advanced_testcase {
         } catch (moodle_exception $e) {
             $this->assertEquals('invalidrecord', $e->errorcode);
         }
+
+    }
+
+    /**
+     * Test get scorm scoes (with a complex SCORM package)
+     */
+    public function test_mod_scorm_get_scorm_scoes_complex_package() {
+        global $CFG;
+
+        // As student.
+        self::setUser($this->student);
+
+        $record = new stdClass();
+        $record->course = $this->course->id;
+        $record->packagefilepath = $CFG->dirroot.'/mod/scorm/tests/packages/complexscorm.zip';
+        $scorm = self::getDataGenerator()->create_module('scorm', $record);
+
+        $result = mod_scorm_external::get_scorm_scoes($scorm->id);
+        $result = external_api::clean_returnvalue(mod_scorm_external::get_scorm_scoes_returns(), $result);
+        $this->assertCount(9, $result['scoes']);
+        $this->assertCount(0, $result['warnings']);
+
+        $expectedscoes = array();
+        $scoreturnstructure = mod_scorm_external::get_scorm_scoes_returns();
+        $scoes = scorm_get_scoes($scorm->id);
+        foreach ($scoes as $sco) {
+            $sco->extradata = array();
+            foreach ($sco as $element => $value) {
+                // Add the extra data to the extradata array and remove the object element.
+                if (!isset($scoreturnstructure->keys['scoes']->content->keys[$element])) {
+                    $sco->extradata[] = array(
+                        'element' => $element,
+                        'value' => $value
+                    );
+                    unset($sco->{$element});
+                }
+            }
+            $expectedscoes[] = (array) $sco;
+        }
+
+        $this->assertEquals($expectedscoes, $result['scoes']);
     }
 
     /*
@@ -593,8 +655,8 @@ class mod_scorm_external_testcase extends externallib_advanced_testcase {
         $result = mod_scorm_external::get_scorms_by_courses(array($course1->id));
         $result = external_api::clean_returnvalue($returndescription, $result);
         $this->assertCount(1, $result['warnings']);
-        // Only 'id', 'coursemodule', 'course', 'name', 'intro', 'introformat'.
-        $this->assertCount(6, $result['scorms'][0]);
+        // Only 'id', 'coursemodule', 'course', 'name', 'intro', 'introformat', 'introfiles'.
+        $this->assertCount(7, $result['scorms'][0]);
         $this->assertEquals('expired', $result['warnings'][0]['warningcode']);
 
         $scorm1->timeopen = $timenow + DAYSECS;
@@ -604,8 +666,8 @@ class mod_scorm_external_testcase extends externallib_advanced_testcase {
         $result = mod_scorm_external::get_scorms_by_courses(array($course1->id));
         $result = external_api::clean_returnvalue($returndescription, $result);
         $this->assertCount(1, $result['warnings']);
-        // Only 'id', 'coursemodule', 'course', 'name', 'intro', 'introformat'.
-        $this->assertCount(6, $result['scorms'][0]);
+        // Only 'id', 'coursemodule', 'course', 'name', 'intro', 'introformat', 'introfiles'.
+        $this->assertCount(7, $result['scorms'][0]);
         $this->assertEquals('notopenyet', $result['warnings'][0]['warningcode']);
 
         // Reset times.
@@ -660,6 +722,9 @@ class mod_scorm_external_testcase extends externallib_advanced_testcase {
 
             // Since we return the fields used as boolean as PARAM_BOOL instead PARAM_INT we need to force casting here.
             // From the returned fields definition we obtain the type expected for the field.
+            if (empty($returndescription->keys['scorms']->content->keys[$field]->type)) {
+                continue;
+            }
             $fieldtype = $returndescription->keys['scorms']->content->keys[$field]->type;
             if ($fieldtype == PARAM_BOOL) {
                 $expected1[$field] = (bool) $scorm1->{$field};
@@ -669,6 +734,8 @@ class mod_scorm_external_testcase extends externallib_advanced_testcase {
                 $expected2[$field] = $scorm2->{$field};
             }
         }
+        $expected1['introfiles'] = [];
+        $expected2['introfiles'] = [];
 
         $expectedscorms = array();
         $expectedscorms[] = $expected2;
@@ -703,8 +770,8 @@ class mod_scorm_external_testcase extends externallib_advanced_testcase {
         self::setUser($teacher);
 
         $additionalfields = array('updatefreq', 'timemodified', 'options',
-                                    'completionstatusrequired', 'completionscorerequired', 'autocommit',
-                                    'section', 'visible', 'groupmode', 'groupingid');
+                                    'completionstatusrequired', 'completionscorerequired', 'completionstatusallscos',
+                                    'autocommit', 'section', 'visible', 'groupmode', 'groupingid');
 
         foreach ($additionalfields as $field) {
             $fieldtype = $returndescription->keys['scorms']->content->keys[$field]->type;
@@ -738,5 +805,67 @@ class mod_scorm_external_testcase extends externallib_advanced_testcase {
         $result = mod_scorm_external::get_scorms_by_courses(array($course1->id));
         $result = external_api::clean_returnvalue($returndescription, $result);
         $this->assertEquals($expectedscorms, $result['scorms']);
+    }
+
+    /**
+     * Test launch_sco
+     */
+    public function test_launch_sco() {
+        global $DB;
+
+        // Test invalid instance id.
+        try {
+            mod_scorm_external::launch_sco(0);
+            $this->fail('Exception expected due to invalid mod_scorm instance id.');
+        } catch (moodle_exception $e) {
+            $this->assertEquals('invalidrecord', $e->errorcode);
+        }
+
+        // Test not-enrolled user.
+        $user = self::getDataGenerator()->create_user();
+        $this->setUser($user);
+        try {
+            mod_scorm_external::launch_sco($this->scorm->id);
+            $this->fail('Exception expected due to not enrolled user.');
+        } catch (moodle_exception $e) {
+            $this->assertEquals('requireloginerror', $e->errorcode);
+        }
+
+        // Test user with full capabilities.
+        $this->setUser($this->student);
+
+        // Trigger and capture the event.
+        $sink = $this->redirectEvents();
+
+        $scoes = scorm_get_scoes($this->scorm->id);
+        foreach ($scoes as $sco) {
+            // Find launchable SCO.
+            if ($sco->launch != '') {
+                break;
+            }
+        }
+
+        $result = mod_scorm_external::launch_sco($this->scorm->id, $sco->id);
+        $result = external_api::clean_returnvalue(mod_scorm_external::launch_sco_returns(), $result);
+
+        $events = $sink->get_events();
+        $this->assertCount(1, $events);
+        $event = array_shift($events);
+
+        // Checking that the event contains the expected values.
+        $this->assertInstanceOf('\mod_scorm\event\sco_launched', $event);
+        $this->assertEquals($this->context, $event->get_context());
+        $moodleurl = new \moodle_url('/mod/scorm/player.php', array('id' => $this->cm->id, 'scoid' => $sco->id));
+        $this->assertEquals($moodleurl, $event->get_url());
+        $this->assertEventContextNotUsed($event);
+        $this->assertNotEmpty($event->get_name());
+
+        // Invalid SCO.
+        try {
+            mod_scorm_external::launch_sco($this->scorm->id, -1);
+            $this->fail('Exception expected due to invalid SCO id.');
+        } catch (moodle_exception $e) {
+            $this->assertEquals('cannotfindsco', $e->errorcode);
+        }
     }
 }

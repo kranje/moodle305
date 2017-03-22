@@ -16,8 +16,6 @@ Feature: Enable Block Completion in a course
       | user     | course | role           |
       | teacher1 | C1     | editingteacher |
       | student1 | C1     | student        |
-    And the following config values are set as admin:
-      | enablecompletion | 1 |
 
   Scenario: Add the block to a the course where completion is disabled
     Given I log in as "teacher1"
@@ -45,7 +43,7 @@ Feature: Enable Block Completion in a course
     And I follow "Course 1"
     And I turn editing mode on
     And I follow "Test page name"
-    And I navigate to "Edit settings" node in "Page module administration"
+    And I navigate to "Edit settings" in current page administration
     And I set the following fields to these values:
       | Completion tracking | Show activity as complete when conditions are met |
       | Require view | 1 |
