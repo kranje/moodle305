@@ -89,7 +89,7 @@ class assign {
     /** @var stdClass the assignment record that contains the global settings for this assign instance */
     private $instance;
 
-    /** @var stdClass the grade_item record for this assign instance's primary grade item. */
+    /** @var grade_item the grade_item record for this assign instance's primary grade item. */
     private $gradeitem;
 
     /** @var context the context of the course module for this assign instance
@@ -1203,7 +1203,7 @@ class assign {
     /**
      * Get the primary grade item for this assign instance.
      *
-     * @return stdClass The grade_item record
+     * @return grade_item The grade_item record
      */
     public function get_grade_item() {
         if ($this->gradeitem) {
@@ -1337,7 +1337,7 @@ class assign {
                 if ($grade < 0) {
                     $displaygrade = '';
                 } else {
-                    $displaygrade = format_float($grade, 2);
+                    $displaygrade = format_float($grade, $this->get_grade_item()->get_decimals());
                 }
                 $o .= '<label class="accesshide" for="quickgrade_' . $userid . '">' .
                        get_string('usergrade', 'assign') .
@@ -1349,7 +1349,7 @@ class assign {
                               size="6"
                               maxlength="10"
                               class="quickgrade"/>';
-                $o .= '&nbsp;/&nbsp;' . format_float($this->get_instance()->grade, 2);
+                $o .= '&nbsp;/&nbsp;' . format_float($this->get_instance()->grade, $this->get_grade_item()->get_decimals());
                 return $o;
             } else {
                 if ($grade == -1 || $grade === null) {
@@ -1359,7 +1359,7 @@ class assign {
                     $o .= grade_format_gradevalue($grade, $item);
                     if ($item->get_displaytype() == GRADE_DISPLAY_TYPE_REAL) {
                         // If displaying the raw grade, also display the total value.
-                        $o .= '&nbsp;/&nbsp;' . format_float($this->get_instance()->grade, 2);
+                        $o .= '&nbsp;/&nbsp;' . format_float($this->get_instance()->grade, $item->get_decimals());
                     }
                 }
                 return $o;
@@ -1474,6 +1474,10 @@ class assign {
                         $count += 1;
                     }
                 }
+            } else if ($activitygroup != 0 && empty($groups)) {
+                // Set count to 1 if $groups returns empty.
+                // It means the group is not part of $this->get_instance()->teamsubmissiongroupingid.
+                $count = 1;
             }
         } else {
             // It is faster to loop around participants if no grouping was specified.
@@ -1645,6 +1649,12 @@ class assign {
                                                 array_keys($participants),
                                                 $this->get_instance()->teamsubmissiongroupingid,
                                                 'DISTINCT g.id, g.name');
+                if (empty($groups)) {
+                    // If $groups is empty it means it is not part of $this->get_instance()->teamsubmissiongroupingid.
+                    // All submissions from students that do not belong to any of teamsubmissiongroupingid groups
+                    // count towards groupid = 0. Setting to true as only '0' key matters.
+                    $groups = [true];
+                }
                 list($groupssql, $groupsparams) = $DB->get_in_or_equal(array_keys($groups), SQL_PARAMS_NAMED);
                 $groupsstr = 's.groupid ' . $groupssql . ' AND';
                 $params = $params + $groupsparams;
@@ -2264,7 +2274,7 @@ class assign {
                 $grade = '-';
             }
 
-            $courseindexsummary->add_assign_info($cm->id, $cm->name, $sectionname, $timedue, $submitted, $grade);
+            $courseindexsummary->add_assign_info($cm->id, $cm->get_formatted_name(), $sectionname, $timedue, $submitted, $grade);
 
         }
 
@@ -2287,7 +2297,7 @@ class assign {
         $o = '';
 
         $pluginsubtype = required_param('pluginsubtype', PARAM_ALPHA);
-        $plugintype = required_param('plugin', PARAM_TEXT);
+        $plugintype = required_param('plugin', PARAM_PLUGIN);
         $pluginaction = required_param('pluginaction', PARAM_ALPHA);
 
         $plugin = $this->get_plugin_by_type($pluginsubtype, $plugintype);
@@ -2361,7 +2371,7 @@ class assign {
 
         $submissionid = optional_param('sid', 0, PARAM_INT);
         $gradeid = optional_param('gid', 0, PARAM_INT);
-        $plugintype = required_param('plugin', PARAM_TEXT);
+        $plugintype = required_param('plugin', PARAM_PLUGIN);
         $item = null;
         if ($pluginsubtype == 'assignsubmission') {
             $plugin = $this->get_submission_plugin_by_type($plugintype);
@@ -2930,9 +2940,9 @@ class assign {
         if ($attemptnumber < 0 || $create) {
             // Make sure this grade matches the latest submission attempt.
             if ($this->get_instance()->teamsubmission) {
-                $submission = $this->get_group_submission($userid, 0, true);
+                $submission = $this->get_group_submission($userid, 0, true, $attemptnumber);
             } else {
-                $submission = $this->get_user_submission($userid, true);
+                $submission = $this->get_user_submission($userid, true, $attemptnumber);
             }
             if ($submission) {
                 $attemptnumber = $submission->attemptnumber;
@@ -3119,7 +3129,7 @@ class assign {
         if ($grade) {
             $data = new stdClass();
             if ($grade->grade !== null && $grade->grade >= 0) {
-                $data->grade = format_float($grade->grade, 2);
+                $data->grade = format_float($grade->grade, $this->get_grade_item()->get_decimals());
             }
         } else {
             $data = new stdClass();
@@ -5370,7 +5380,7 @@ class assign {
             $record->userid = $userid;
             if ($modified >= 0) {
                 $record->grade = unformat_float(optional_param('quickgrade_' . $record->userid, -1, PARAM_TEXT));
-                $record->workflowstate = optional_param('quickgrade_' . $record->userid.'_workflowstate', false, PARAM_TEXT);
+                $record->workflowstate = optional_param('quickgrade_' . $record->userid.'_workflowstate', false, PARAM_ALPHA);
                 $record->allocatedmarker = optional_param('quickgrade_' . $record->userid.'_allocatedmarker', false, PARAM_INT);
             } else {
                 // This user was not in the grading table.
@@ -6500,7 +6510,7 @@ class assign {
         $mform->setType('userid', PARAM_INT);
 
         $mform->addElement('hidden', 'action', 'savesubmission');
-        $mform->setType('action', PARAM_TEXT);
+        $mform->setType('action', PARAM_ALPHA);
     }
 
     /**
@@ -7463,6 +7473,10 @@ class assign {
 
         // Check if default gradebook feedback is visible and enabled.
         $gradebookfeedbackplugin = $this->get_feedback_plugin_by_type($gradebookplugin);
+
+        if (empty($gradebookfeedbackplugin)) {
+            return false;
+        }
 
         if ($gradebookfeedbackplugin->is_visible() && $gradebookfeedbackplugin->is_enabled()) {
             return true;
