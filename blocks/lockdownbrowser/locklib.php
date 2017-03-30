@@ -5,7 +5,7 @@
 
 // Set true to require per-session locking for access to unused token records;
 // requires Moodle 2.7+.
-$lockdownbrowser_require_db_locking = false;
+$lockdownbrowser_require_db_locking = true;
 $lockdownbrowser_max_db_lock_time = 10; // seconds
 
 require_once(dirname(__FILE__) . "/locklibcfg.php");
