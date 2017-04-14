@@ -26,6 +26,25 @@ require_once('../../config.php');
 require_once($CFG->dirroot . '/mod/assign/locallib.php');
 
 $id = required_param('id', PARAM_INT);
+//Longfei-OIT, 04-08-2016, jira 768, download all instructor files from a course
+$courseid = optional_param('downloadcourseid', 0, PARAM_INT);
+if ($courseid) {
+    $urlparams = array('id' => $id,
+        'action' => optional_param('action', '', PARAM_TEXT),
+        'rownum' => optional_param('rownum', 0, PARAM_INT),
+        'useridlistid' => optional_param('action', 0, PARAM_INT));
+
+    $url = new moodle_url('/mod/assign/view.php', $urlparams);
+    $cm = get_coursemodule_from_id('assign', $id, 0, false, MUST_EXIST);
+    $course = $DB->get_record('course', array('id' => $courseid), '*', MUST_EXIST);
+    $PAGE->set_url($url);
+    $assign = new assign(null, $cm, $course);
+
+// Get the assign class to
+// render the page.
+    echo $assign->view(optional_param('action', '', PARAM_TEXT));
+} else {
+//=================================end 768============================
 
 list ($course, $cm) = get_course_and_cm_from_cmid($id, 'assign');
 
@@ -37,7 +56,7 @@ require_capability('mod/assign:view', $context);
 
 $assign = new assign($context, $cm, $course);
 $urlparams = array('id' => $id,
-                  'action' => optional_param('action', '', PARAM_ALPHA),
+                  'action' => optional_param('action', '', PARAM_TEXT),
                   'rownum' => optional_param('rownum', 0, PARAM_INT),
                   'useridlistid' => optional_param('useridlistid', $assign->get_useridlist_key_id(), PARAM_ALPHANUM));
 
@@ -49,4 +68,7 @@ $completion->set_module_viewed($cm);
 
 // Get the assign class to
 // render the page.
-echo $assign->view(optional_param('action', '', PARAM_ALPHA));
+echo $assign->view(optional_param('action', '', PARAM_TEXT));
+//Longfei-OIT, 04-09-2015, jira 768, download all instructor files from a course
+}
+//===================================

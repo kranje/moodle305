@@ -2458,7 +2458,9 @@ class global_navigation extends navigation_node {
 
         $coursenode = $parent->add($coursename, $url, self::TYPE_COURSE, $shortname, $course->id);
         $coursenode->hidden = (!$course->visible);
-        $coursenode->title(format_string($course->fullname, true, array('context' => $coursecontext, 'escape' => false)));
+        // We need to decode &amp;'s here as they will have been added by format_string above and attributes will be encoded again
+        // later.
+        $coursenode->title(str_replace('&amp;', '&', $fullname));
         if ($canexpandcourse) {
             // This course can be expanded by the user, make it a branch to make the system aware that its expandable by ajax.
             $coursenode->nodetype = self::NODETYPE_BRANCH;
@@ -2598,7 +2600,6 @@ class global_navigation extends navigation_node {
         }
 
         $sitecontext = context_system::instance();
-        $isfrontpage = ($course->id == SITEID);
 
         // Hidden node that we use to determine if the front page navigation is loaded.
         // This required as there are not other guaranteed nodes that may be loaded.
@@ -2607,8 +2608,8 @@ class global_navigation extends navigation_node {
         // Participants.
         // If this is the site course, they need to have moodle/site:viewparticipants at the site level.
         // If no, then they need to have moodle/course:viewparticipants at the course level.
-        if (($isfrontpage && has_capability('moodle/site:viewparticipants', $sitecontext)) ||
-                (!$isfrontpage && has_capability('moodle/course:viewparticipants', context_course::instance($course->id)))) {
+        if ((($course->id == SITEID) && has_capability('moodle/site:viewparticipants', $sitecontext)) ||
+                has_capability('moodle/course:viewparticipants', context_course::instance($course->id))) {
             $coursenode->add(get_string('participants'), new moodle_url('/user/index.php?id='.$course->id), self::TYPE_CUSTOM, get_string('participants'), 'participants');
         }
 
@@ -3831,6 +3832,15 @@ class settings_navigation extends navigation_node {
             $coursenode->add(get_string('gradebooksetup', 'grades'), $url, self::TYPE_SETTING,
                 null, 'gradebooksetup', new pix_icon('i/settings', ''));
         }
+        //Longfei-OIT, 04-08-2016, jira 768, download all instructor files from a course
+        if (has_capability('moodle/course:update', $coursecontext)) {
+            global $DB;
+            $assign = $DB->get_record_sql("select id from {course_modules} where module=(select id from {modules} where name='assign') and instance=
+                (select min(id) from {assign})");
+            $url = new moodle_url('/mod/assign/view.php', array('id'=>$assign->id, 'action'=>'downloadteacherfiles', 'downloadcourseid'=>$course->id));
+            $coursenode->add('Download instructor files', $url, self::TYPE_SETTING, null, '', new pix_icon('t/download', ''));
+        }
+        //=====================================================
 
         //  Add outcome if permitted
         if (!empty($CFG->enableoutcomes) && has_capability('moodle/course:update', $coursecontext)) {
