@@ -109,6 +109,16 @@ class backup_logger_testcase extends basic_testcase {
         $this->assertEquals($lo1->get_levelstr(backup::LOG_WARNING), 'warn');
         $this->assertEquals($lo1->get_levelstr(backup::LOG_INFO), 'info');
         $this->assertEquals($lo1->get_levelstr(backup::LOG_DEBUG), 'debug');
+
+        // Test destroy.
+        $lo1 = new mock_base_logger1(backup::LOG_ERROR);
+        $lo2 = new mock_base_logger2(backup::LOG_ERROR);
+        $lo1->set_next($lo2);
+        $this->assertInstanceOf('base_logger', $lo1->get_next());
+        $this->assertNull($lo2->get_next());
+        $lo1->destroy();
+        $this->assertNull($lo1->get_next());
+        $this->assertNull($lo2->get_next());
     }
 
     /**
@@ -250,9 +260,9 @@ class backup_logger_testcase extends basic_testcase {
         $result = $lo2->process($message2, backup::LOG_WARNING, $options);
         $this->assertTrue($result);
 
-        // Destruct loggers
-        $lo1 = null;
-        $lo2 = null;
+        // Destroy loggers.
+        $lo1->destroy();
+        $lo2->destroy();
 
         // Load file results to analyze them
         $fcontents = file_get_contents($file);
@@ -276,6 +286,7 @@ class backup_logger_testcase extends basic_testcase {
         $this->assertTrue(file_exists($file));
         $message = 'testing file_logger';
         $result = $lo->process($message, backup::LOG_ERROR, $options);
+        $lo->close(); // Closes logger.
         // Get file contents and inspect them
         $fcontents = file_get_contents($file);
         $this->assertTrue($result);
@@ -283,7 +294,6 @@ class backup_logger_testcase extends basic_testcase {
         $this->assertTrue(strpos($fcontents, '[error]') !== false);
         $this->assertTrue(strpos($fcontents, '&nbsp;&nbsp;') !== false);
         $this->assertTrue(substr_count($fcontents , '] ') >= 2);
-        $lo->__destruct(); // closes file handle
         unlink($file); // delete file
 
         // Instantiate, write something, force deletion, try to write again
@@ -293,7 +303,8 @@ class backup_logger_testcase extends basic_testcase {
         $this->assertTrue(file_exists($file));
         $message = 'testing file_logger';
         $result = $lo->process($message, backup::LOG_ERROR);
-        fclose($lo->get_fhandle()); // close file
+        $lo->close();
+        $this->assertNull($lo->get_fhandle());
         try {
             $result = @$lo->process($message, backup::LOG_ERROR); // Try to write again
             $this->assertTrue(false, 'base_logger_exception expected');
@@ -327,6 +338,7 @@ class backup_logger_testcase extends basic_testcase {
         $lo = new file_logger(backup::LOG_NONE, true, true, $file);
         $this->assertTrue($lo instanceof file_logger);
         $this->assertFalse(file_exists($file));
+        $lo->close();
 
         // Remove the test dir and any content
         @remove_dir(dirname($file));

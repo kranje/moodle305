@@ -133,7 +133,7 @@ class forum_post implements \renderable, \templatable {
     /**
      * Export this data so it can be used as the context for a mustache template.
      *
-     * @param \base_renderer $renderer The render to be used for formatting the message and attachments
+     * @param \mod_forum_renderer $renderer The render to be used for formatting the message and attachments
      * @param bool $plaintext Whethe the target is a plaintext target
      * @return stdClass Data ready for use in a mustache template
      */
@@ -441,6 +441,26 @@ class forum_post implements \renderable, \templatable {
     }
 
     /**
+     * ID number of the course that the forum is in.
+     *
+     * @return string
+     */
+    public function get_courseidnumber() {
+        return s($this->course->idnumber);
+    }
+
+    /**
+     * The full name of the course that the forum is in.
+     *
+     * @return string
+     */
+    public function get_coursefullname() {
+        return format_string($this->course->fullname, true, array(
+            'context' => \context_course::instance($this->course->id),
+        ));
+    }
+
+    /**
      * The name of the course that the forum is in.
      *
      * @return string
@@ -518,7 +538,6 @@ class forum_post implements \renderable, \templatable {
         }
 
         return userdate($postmodified, "", \core_date::get_user_timezone($this->get_postto()));
-
     }
 
     /**

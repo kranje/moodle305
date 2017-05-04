@@ -21,32 +21,6 @@ defined('MOODLE_INTERNAL') || die();
  * @return bool result
  */
 function xmldb_repository_dropbox_upgrade($oldversion) {
-    // Moodle v2.3.0 release upgrade line
-    // Put any upgrade step following this
-
-    if ($oldversion < 2012080702) {
-        // Set the default value for dropbox_cachelimit
-        $value = get_config('dropbox', 'dropbox_cachelimit');
-        if (empty($value)) {
-            set_config('dropbox_cachelimit', 1024*1024, 'dropbox');
-        }
-        upgrade_plugin_savepoint(true, 2012080702, 'repository', 'dropbox');
-    }
-
-    // Moodle v2.4.0 release upgrade line
-    // Put any upgrade step following this
-
-
-    // Moodle v2.5.0 release upgrade line.
-    // Put any upgrade step following this.
-
-
-    // Moodle v2.6.0 release upgrade line.
-    // Put any upgrade step following this.
-
-    // Moodle v2.7.0 release upgrade line.
-    // Put any upgrade step following this.
-
     // Moodle v2.8.0 release upgrade line.
     // Put any upgrade step following this.
 
@@ -56,10 +30,15 @@ function xmldb_repository_dropbox_upgrade($oldversion) {
     // Moodle v3.0.0 release upgrade line.
     // Put any upgrade step following this.
 
-    if ($oldversion < 2015111601) {
-        set_config('legacyapi', 1, 'dropbox');
-        upgrade_plugin_savepoint(true, 2015111601, 'repository', 'dropbox');
+    // Moodle v3.1.0 release upgrade line.
+    // Put any upgrade step following this.
+
+    if ($oldversion < 2016091300) {
+        unset_config('legacyapi', 'dropbox');
+        upgrade_plugin_savepoint(true, 2016091300, 'repository', 'dropbox');
     }
+    // Automatically generated Moodle v3.2.0 release upgrade line.
+    // Put any upgrade step following this.
 
     return true;
 }

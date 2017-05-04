@@ -71,10 +71,7 @@ class restore_course_task extends restore_task {
             $this->add_step(new restore_course_structure_step('course_info', 'course.xml'));
         }
 
-        // Execute if coming from older than Moodle 2.0, or if the setting is set.
-        if ($this->get_setting_value('legacy_files') == true) {
-            $this->add_step(new restore_course_legacy_files_step('legacy_files'));
-        }
+        $this->add_step(new restore_course_legacy_files_step('legacy_files'));
 
         // Deal with enrolment methods and user enrolments.
         if ($this->plan->get_mode() == backup::MODE_IMPORT) {
@@ -114,6 +111,9 @@ class restore_course_task extends restore_task {
         if ($this->get_setting_value('calendarevents')) {
             $this->add_step(new restore_calendarevents_structure_step('course_calendar', 'calendar.xml'));
         }
+
+        // Course competencies.
+        $this->add_step(new restore_course_competencies_structure_step('course_competencies', 'competencies.xml'));
 
         // At the end, mark it as built
         $this->built = true;
@@ -203,13 +203,5 @@ class restore_course_task extends restore_task {
         }
         $this->add_setting($overwrite);
 
-        // Define legacy_files to decide if legacy files will be restored
-        $legacyfiles = new restore_course_legacy_files_setting('legacy_files', base_setting::IS_BOOLEAN, true);
-        $legacyfiles->set_ui(new backup_setting_ui_select($legacyfiles, $legacyfiles->get_name(), array(1=>get_string('yes'), 0=>get_string('no'))));
-        $legacyfiles->get_ui()->set_label(get_string('setting_legacyfiles', 'backup'));
-        if ($this->get_target() == backup::TARGET_NEW_COURSE) {
-            $legacyfiles->set_value(true);
-        }
-        $this->add_setting($legacyfiles);
     }
 }

@@ -32,8 +32,7 @@ use Behat\Mink\Exception\ExpectationException as ExpectationException,
     Behat\Mink\Exception\DriverException as DriverException,
     WebDriver\Exception\NoSuchElement as NoSuchElement,
     WebDriver\Exception\StaleElementReference as StaleElementReference,
-    Behat\Gherkin\Node\TableNode as TableNode,
-    Behat\Behat\Context\Step\Given as Given;
+    Behat\Gherkin\Node\TableNode as TableNode;
 
 /**
  * Cross component steps definitions.
@@ -85,6 +84,15 @@ class behat_general extends behat_base {
      */
     public function i_am_on_site_homepage() {
         $this->getSession()->visit($this->locate_path('/?redirect=0'));
+    }
+
+    /**
+     * Opens course index page.
+     *
+     * @Given /^I am on course index$/
+     */
+    public function i_am_on_course_index() {
+        $this->getSession()->visit($this->locate_path('/course/index.php'));
     }
 
     /**
@@ -192,7 +200,7 @@ class behat_general extends behat_base {
         // unnamed window (presumably the main window) to some other named
         // window, then we first set the main window name to a conventional
         // value that we can later use this name to switch back.
-        $this->getSession()->evaluateScript(
+        $this->getSession()->executeScript(
                 'if (window.name == "") window.name = "' . self::MAIN_WINDOW_NAME . '"');
 
         $this->getSession()->switchToWindow($windowname);
@@ -258,8 +266,9 @@ class behat_general extends behat_base {
      */
     public function wait_until_the_page_is_ready() {
 
+        // No need to wait if not running JS.
         if (!$this->running_javascript()) {
-            throw new DriverException('Waits are disabled in scenarios without Javascript support');
+            return;
         }
 
         $this->getSession()->wait(self::TIMEOUT * 1000, self::PAGE_READY_JS);
@@ -540,7 +549,7 @@ class behat_general extends behat_base {
 
         // Looking for all the matching nodes without any other descendant matching the
         // same xpath (we are using contains(., ....).
-        $xpathliteral = $this->getSession()->getSelectorsHandler()->xpathLiteral($text);
+        $xpathliteral = behat_context_helper::escape($text);
         $xpath = "/descendant-or-self::*[contains(., $xpathliteral)]" .
             "[count(descendant::*[contains(., $xpathliteral)]) = 0]";
 
@@ -590,7 +599,7 @@ class behat_general extends behat_base {
 
         // Looking for all the matching nodes without any other descendant matching the
         // same xpath (we are using contains(., ....).
-        $xpathliteral = $this->getSession()->getSelectorsHandler()->xpathLiteral($text);
+        $xpathliteral = behat_context_helper::escape($text);
         $xpath = "/descendant-or-self::*[contains(., $xpathliteral)]" .
             "[count(descendant::*[contains(., $xpathliteral)]) = 0]";
 
@@ -615,8 +624,16 @@ class behat_general extends behat_base {
             function($context, $args) {
 
                 foreach ($args['nodes'] as $node) {
-                    if ($node->isVisible()) {
-                        throw new ExpectationException('"' . $args['text'] . '" text was found in the page', $context->getSession());
+                    // If element is removed from dom, then just exit.
+                    try {
+                        // If element is visible then throw exception, so we keep spinning.
+                        if ($node->isVisible()) {
+                            throw new ExpectationException('"' . $args['text'] . '" text was found in the page',
+                                $context->getSession());
+                        }
+                    } catch (WebDriver\Exception\NoSuchElement $e) {
+                        // Do nothing just return, as element is no more on page.
+                        return true;
                     }
                 }
 
@@ -628,7 +645,6 @@ class behat_general extends behat_base {
             false,
             true
         );
-
     }
 
     /**
@@ -648,7 +664,7 @@ class behat_general extends behat_base {
 
         // Looking for all the matching nodes without any other descendant matching the
         // same xpath (we are using contains(., ....).
-        $xpathliteral = $this->getSession()->getSelectorsHandler()->xpathLiteral($text);
+        $xpathliteral = behat_context_helper::escape($text);
         $xpath = "/descendant-or-self::*[contains(., $xpathliteral)]" .
             "[count(descendant::*[contains(., $xpathliteral)]) = 0]";
 
@@ -702,7 +718,7 @@ class behat_general extends behat_base {
 
         // Looking for all the matching nodes without any other descendant matching the
         // same xpath (we are using contains(., ....).
-        $xpathliteral = $this->getSession()->getSelectorsHandler()->xpathLiteral($text);
+        $xpathliteral = behat_context_helper::escape($text);
         $xpath = "/descendant-or-self::*[contains(., $xpathliteral)]" .
             "[count(descendant::*[contains(., $xpathliteral)]) = 0]";
 
@@ -993,6 +1009,43 @@ class behat_general extends behat_base {
     }
 
     /**
+     * Runs all ad-hoc tasks in the queue.
+     *
+     * This is faster and more reliable than running cron (running cron won't
+     * work more than once in the same test, for instance). However it is
+     * a little less 'realistic'.
+     *
+     * While the task is running, we suppress mtrace output because it makes
+     * the Behat result look ugly.
+     *
+     * @Given /^I run all adhoc tasks$/
+     * @throws DriverException
+     */
+    public function i_run_all_adhoc_tasks() {
+        // Do setup for cron task.
+        cron_setup_user();
+
+        // Run tasks. Locking is handled by get_next_adhoc_task.
+        $now = time();
+        ob_start(); // Discard task output as not appropriate for Behat output!
+        while (($task = \core\task\manager::get_next_adhoc_task($now)) !== null) {
+
+            try {
+                $task->execute();
+
+                // Mark task complete.
+                \core\task\manager::adhoc_task_complete($task);
+            } catch (Exception $e) {
+                // Mark task failed and throw exception.
+                \core\task\manager::adhoc_task_failed($task);
+                ob_end_clean();
+                throw new DriverException('An adhoc task failed', 0, $e);
+            }
+        }
+        ob_end_clean();
+    }
+
+    /**
      * Checks that an element and selector type exists in another element and selector type on the current page.
      *
      * This step is for advanced users, use it if you don't find anything else suitable for what you need.
@@ -1130,9 +1183,9 @@ class behat_general extends behat_base {
         $tablenode = $this->get_selected_node('table', $table);
         $tablexpath = $tablenode->getXpath();
 
-        $rowliteral = $this->getSession()->getSelectorsHandler()->xpathLiteral($row);
-        $valueliteral = $this->getSession()->getSelectorsHandler()->xpathLiteral($value);
-        $columnliteral = $this->getSession()->getSelectorsHandler()->xpathLiteral($column);
+        $rowliteral = behat_context_helper::escape($row);
+        $valueliteral = behat_context_helper::escape($value);
+        $columnliteral = behat_context_helper::escape($column);
 
         if (preg_match('/^-?(\d+)-?$/', $column, $columnasnumber)) {
             // Column indicated as a number, just use it as position of the column.
@@ -1160,7 +1213,9 @@ class behat_general extends behat_base {
 
         // Check if value exists in specific row/column.
         // Get row xpath.
-        $rowxpath = $tablexpath."/tbody/tr[th[normalize-space(.)=" . $rowliteral . "] or td[normalize-space(.)=" . $rowliteral . "]]";
+        // GoutteDriver uses DomCrawler\Crawler and it is making XPath relative to the current context, so use descendant.
+        $rowxpath = $tablexpath."/tbody/tr[descendant::th[normalize-space(.)=" . $rowliteral .
+                    "] | descendant::td[normalize-space(.)=" . $rowliteral . "]]";
 
         $columnvaluexpath = $rowxpath . $columnpositionxpath . "[contains(normalize-space(.)," . $valueliteral . ")]";
 
@@ -1266,7 +1321,7 @@ class behat_general extends behat_base {
      * @param string $link the text of the link.
      * @return string the content of the downloaded file.
      */
-    protected function download_file_from_link($link) {
+    public function download_file_from_link($link) {
         // Find the link.
         $linknode = $this->find_link($link);
         $this->ensure_node_is_visible($linknode);
@@ -1385,7 +1440,7 @@ class behat_general extends behat_base {
 
         $this->pageloaddetectionrunning = true;
 
-        $session->evaluateScript(
+        $session->executeScript(
                 'var span = document.createElement("span");
                 span.setAttribute("data-rel", "' . self::PAGE_LOAD_DETECTION_STRING . '");
                 span.setAttribute("style", "display: none;");
@@ -1538,6 +1593,24 @@ class behat_general extends behat_base {
         $node->keyDown($char, $modifier);
         $node->keyPress($char, $modifier);
         $node->keyUp($char, $modifier);
+    }
+
+    /**
+     * Press tab key on a specific element.
+     *
+     * @When /^I press tab key in "(?P<element_string>(?:[^"]|\\")*)" "(?P<selector_string>[^"]*)"$/
+     * @param string $element Element we look for
+     * @param string $selectortype The type of what we look for
+     * @throws DriverException
+     * @throws ExpectationException
+     */
+    public function i_post_tab_key_in_element($element, $selectortype) {
+        if (!$this->running_javascript()) {
+            throw new DriverException('Tab press step is not available with Javascript disabled');
+        }
+        // Gets the node based on the requested selector type and locator.
+        $node = $this->get_selected_node($selectortype, $element);
+        $this->getSession()->getDriver()->post_key("\xEE\x80\x84", $node->getXpath());
     }
 
     /**

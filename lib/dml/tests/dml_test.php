@@ -1919,13 +1919,16 @@ class core_dml_testcase extends database_driver_testcase {
 
         $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
         $table->add_field('course', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('onebinary', XMLDB_TYPE_BINARY, 'big', null, null, null);
         $table->add_key('primary', XMLDB_KEY_PRIMARY, array('id'));
         $dbman->create_table($table);
 
-        $DB->insert_record($tablename, array('course' => 1));
-        $DB->insert_record($tablename, array('course' => 3));
-        $DB->insert_record($tablename, array('course' => 2));
-        $DB->insert_record($tablename, array('course' => 6));
+        $binarydata = '\\'.chr(241);
+
+        $DB->insert_record($tablename, array('course' => 1, 'onebinary' => $binarydata));
+        $DB->insert_record($tablename, array('course' => 3, 'onebinary' => $binarydata));
+        $DB->insert_record($tablename, array('course' => 2, 'onebinary' => $binarydata));
+        $DB->insert_record($tablename, array('course' => 6, 'onebinary' => $binarydata));
 
         $fieldset = $DB->get_fieldset_sql("SELECT * FROM {{$tablename}} WHERE course > ?", array(1));
         $this->assertInternalType('array', $fieldset);
@@ -1934,6 +1937,14 @@ class core_dml_testcase extends database_driver_testcase {
         $this->assertEquals(2, $fieldset[0]);
         $this->assertEquals(3, $fieldset[1]);
         $this->assertEquals(4, $fieldset[2]);
+
+        $fieldset = $DB->get_fieldset_sql("SELECT onebinary FROM {{$tablename}} WHERE course > ?", array(1));
+        $this->assertInternalType('array', $fieldset);
+
+        $this->assertCount(3, $fieldset);
+        $this->assertEquals($binarydata, $fieldset[0]);
+        $this->assertEquals($binarydata, $fieldset[1]);
+        $this->assertEquals($binarydata, $fieldset[2]);
     }
 
     public function test_insert_record_raw() {
@@ -3016,6 +3027,10 @@ class core_dml_testcase extends database_driver_testcase {
         $this->assertEquals($clob, $DB->get_field($tablename, 'onetext', array('id' => 1)), 'Test CLOB set_field (full contents output disabled)');
         $this->assertEquals($blob, $DB->get_field($tablename, 'onebinary', array('id' => 1)), 'Test BLOB set_field (full contents output disabled)');
 
+        // Empty data in binary columns works.
+        $DB->set_field_select($tablename, 'onebinary', '', 'id = ?', array(1));
+        $this->assertEquals('', $DB->get_field($tablename, 'onebinary', array('id' => 1)), 'Blobs need to accept empty values.');
+
         // And "small" LOBs too, just in case.
         $newclob = substr($clob, 0, 500);
         $newblob = substr($blob, 0, 250);
@@ -3814,7 +3829,7 @@ class core_dml_testcase extends database_driver_testcase {
         }
     }
 
-    public function test_sql_binary_equal() {
+    public function test_sql_equal() {
         $DB = $this->tdb;
         $dbman = $DB->get_manager();
 
@@ -3823,20 +3838,51 @@ class core_dml_testcase extends database_driver_testcase {
 
         $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
         $table->add_field('name', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+        $table->add_field('name2', XMLDB_TYPE_CHAR, '255', null, null, null, null);
         $table->add_key('primary', XMLDB_KEY_PRIMARY, array('id'));
         $dbman->create_table($table);
 
-        $DB->insert_record($tablename, array('name'=>'aaa'));
-        $DB->insert_record($tablename, array('name'=>'aáa'));
-        $DB->insert_record($tablename, array('name'=>'aäa'));
-        $DB->insert_record($tablename, array('name'=>'bbb'));
-        $DB->insert_record($tablename, array('name'=>'BBB'));
+        $DB->insert_record($tablename, array('name' => 'one', 'name2' => 'one'));
+        $DB->insert_record($tablename, array('name' => 'ONE', 'name2' => 'ONE'));
+        $DB->insert_record($tablename, array('name' => 'two', 'name2' => 'TWO'));
+        $DB->insert_record($tablename, array('name' => 'öne', 'name2' => 'one'));
+        $DB->insert_record($tablename, array('name' => 'öne', 'name2' => 'ÖNE'));
 
-        $records = $DB->get_records_sql("SELECT * FROM {{$tablename}} WHERE name = ?", array('bbb'));
-        $this->assertEquals(1, count($records), 'SQL operator "=" is expected to be case sensitive');
+        // Case sensitive and accent sensitive (equal and not equal).
+        $sql = "SELECT * FROM {{$tablename}} WHERE " . $DB->sql_equal('name', '?', true, true, false);
+        $records = $DB->get_records_sql($sql, array('one'));
+        $this->assertCount(1, $records);
+        $sql = "SELECT * FROM {{$tablename}} WHERE " . $DB->sql_equal('name', ':name', true, true, true);
+        $records = $DB->get_records_sql($sql, array('name' => 'one'));
+        $this->assertCount(4, $records);
+        // And with column comparison instead of params.
+        $sql = "SELECT * FROM {{$tablename}} WHERE " . $DB->sql_equal('name', 'name2', true, true, false);
+        $records = $DB->get_records_sql($sql);
+        $this->assertCount(2, $records);
 
-        $records = $DB->get_records_sql("SELECT * FROM {{$tablename}} WHERE name = ?", array('aaa'));
-        $this->assertEquals(1, count($records), 'SQL operator "=" is expected to be accent sensitive');
+        // Case insensitive and accent sensitive (equal and not equal).
+        $sql = "SELECT * FROM {{$tablename}} WHERE " . $DB->sql_equal('name', '?', false, true, false);
+        $records = $DB->get_records_sql($sql, array('one'));
+        $this->assertCount(2, $records);
+        $sql = "SELECT * FROM {{$tablename}} WHERE " . $DB->sql_equal('name', ':name', false, true, true);
+        $records = $DB->get_records_sql($sql, array('name' => 'one'));
+        $this->assertCount(3, $records);
+        // And with column comparison instead of params.
+        $sql = "SELECT * FROM {{$tablename}} WHERE " . $DB->sql_equal('name', 'name2', false, true, false);
+        $records = $DB->get_records_sql($sql);
+        $this->assertCount(4, $records);
+
+        // TODO: Accent insensitive is not cross-db, only some drivers support it, so just verify the queries work.
+        $sql = "SELECT * FROM {{$tablename}} WHERE " . $DB->sql_equal('name', '?', true, false);
+        $records = $DB->get_records_sql($sql, array('one'));
+        $this->assertGreaterThanOrEqual(1, count($records)); // At very least, there is 1 record with CS/AI "one".
+        $sql = "SELECT * FROM {{$tablename}} WHERE " . $DB->sql_equal('name', '?', false, false);
+        $records = $DB->get_records_sql($sql, array('one'));
+        $this->assertGreaterThanOrEqual(2, count($records)); // At very least, there are 2 records with CI/AI "one".
+        // And with column comparison instead of params.
+        $sql = "SELECT * FROM {{$tablename}} WHERE " . $DB->sql_equal('name', 'name2', false, false);
+        $records = $DB->get_records_sql($sql);
+        $this->assertGreaterThanOrEqual(4, count($records)); // At very least, there are 4 records with CI/AI names matching.
     }
 
     public function test_sql_like() {
@@ -4131,6 +4177,9 @@ class core_dml_testcase extends database_driver_testcase {
             $this->fail("Expecting an exception, none occurred");
         } catch (moodle_exception $e) {
             $this->assertInstanceOf('coding_exception', $e);
+        } catch (Error $error) {
+            // PHP 7.1 throws Error even earlier.
+            $this->assertRegExp('/Too few arguments to function/', $error->getMessage());
         }
 
         // Cover the function using placeholders in all positions.
@@ -5494,6 +5543,42 @@ class core_dml_testcase extends database_driver_testcase {
             $dbman->drop_table($table);
         }
     }
+
+    /**
+     * Test that the database has full utf8 support (4 bytes).
+     */
+    public function test_four_byte_character_insertion() {
+        $DB = $this->tdb;
+
+        if ($DB->get_dbfamily() === 'mysql' && strpos($DB->get_dbcollation(), 'utf8_') === 0) {
+            $this->markTestSkipped($DB->get_name() .
+                    ' does not support 4 byte characters with only a utf8 collation.
+                    Please change to utf8mb4 for full utf8 support.');
+        }
+
+        $dbman = $this->tdb->get_manager();
+
+        $table = $this->get_test_table();
+        $tablename = $table->getName();
+
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('name', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+        $table->add_field('content', XMLDB_TYPE_TEXT, 'big', null, XMLDB_NOTNULL);
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, array('id'));
+        $dbman->create_table($table);
+
+        $data = array(
+            'name' => 'Name with a four byte character 𠮟る',
+            'content' => 'Content with a four byte emoji 📝 memo.'
+        );
+
+        $insertid = $DB->insert_record($tablename, $data);
+        $result = $DB->get_record($tablename, array('id' => $insertid));
+        $this->assertEquals($data['name'], $result->name);
+        $this->assertEquals($data['content'], $result->content);
+
+        $dbman->drop_table($table);
+    }
 }
 
 /**
@@ -5524,7 +5609,7 @@ class moodle_database_for_testing extends moodle_database {
     protected function normalise_value($column, $value) {}
     public function set_debug($state) {}
     public function get_debug() {}
-    public function change_database_structure($sql) {}
+    public function change_database_structure($sql, $tablenames = null) {}
     public function execute($sql, array $params=null) {}
     public function get_recordset_sql($sql, array $params=null, $limitfrom=0, $limitnum=0) {}
     public function get_records_sql($sql, array $params=null, $limitfrom=0, $limitnum=0) {}

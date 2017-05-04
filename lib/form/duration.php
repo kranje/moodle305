@@ -85,9 +85,12 @@ class MoodleQuickForm_duration extends MoodleQuickForm_group {
     }
 
     /**
-     * Old syntax of class constructor for backward compatibility.
+     * Old syntax of class constructor. Deprecated in PHP7.
+     *
+     * @deprecated since Moodle 3.1
      */
     public function MoodleQuickForm_duration($elementName = null, $elementLabel = null, $options = array(), $attributes = null) {
+        debugging('Use of class name as constructor is deprecated', DEBUG_DEVELOPER);
         self::__construct($elementName, $elementLabel, $options, $attributes);
     }
 
@@ -141,12 +144,14 @@ class MoodleQuickForm_duration extends MoodleQuickForm_group {
         }
         $this->_elements = array();
         // E_STRICT creating elements without forms is nasty because it internally uses $this
-        $this->_elements[] = @MoodleQuickForm::createElement('text', 'number', get_string('time', 'form'), $attributes, true);
+        $number = $this->createFormElement('text', 'number', get_string('time', 'form'), $attributes, true);
+        $number->set_force_ltr(true);
+        $this->_elements[] = $number;
         unset($attributes['size']);
-        $this->_elements[] = @MoodleQuickForm::createElement('select', 'timeunit', get_string('timeunit', 'form'), $this->get_units(), $attributes, true);
+        $this->_elements[] = $this->createFormElement('select', 'timeunit', get_string('timeunit', 'form'), $this->get_units(), $attributes, true);
         // If optional we add a checkbox which the user can use to turn if on
         if($this->_options['optional']) {
-            $this->_elements[] = @MoodleQuickForm::createElement('checkbox', 'enabled', null, get_string('enable'), $this->getAttributes(), true);
+            $this->_elements[] = $this->createFormElement('checkbox', 'enabled', null, get_string('enable'), $this->getAttributes(), true);
         }
         foreach ($this->_elements as $element){
             if (method_exists($element, 'setHiddenLabel')){
@@ -164,6 +169,7 @@ class MoodleQuickForm_duration extends MoodleQuickForm_group {
      * @return bool
      */
     function onQuickFormEvent($event, $arg, &$caller) {
+        $this->setMoodleForm($caller);
         switch ($event) {
             case 'updateValue':
                 // constant values override both default and submitted ones

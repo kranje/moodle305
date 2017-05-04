@@ -112,9 +112,9 @@ class editsection_form extends moodleform {
         $data = parent::get_data();
         if ($data !== null) {
             $editoroptions = $this->_customdata['editoroptions'];
-            // Set name as null if use default section name is checked or if it is an empty string.
-            if (!empty($data->usedefaultname) || strval($data->name) === '') {
-                $data->name = null;
+            // Set name as an empty string if use default section name is checked.
+            if (!empty($data->usedefaultname)) {
+                $data->name = '';
             }
             $data = file_postupdate_standard_editor($data, 'summary', $editoroptions,
                     $editoroptions['context'], 'course', 'section', $data->id);

@@ -21,6 +21,9 @@ Feature: The search forums block allows users to search for forum posts
     And I navigate to "Edit settings" node in "Course administration"
     And I set the field "id_newsitems" to "1"
     And I press "Save and display"
+    And I turn editing mode on
+    And I add the "Latest announcements" block
+    And I add the "Search forums" block
     And I log out
 
   Scenario: Use the search forum block in a course without any forum posts
@@ -34,13 +37,13 @@ Feature: The search forums block allows users to search for forum posts
   Scenario: Use the search forum block in a course with a hidden forum and search for posts
     Given I log in as "teacher1"
     And I follow "Course 1"
-    And I add a new topic to "News forum" forum with:
+    And I add a new topic to "Announcements" forum with:
       | Subject | My subject |
       | Message | My message |
     And I follow "Course 1"
     And I turn editing mode on
-    And I follow "News forum"
-    And I navigate to "Edit settings" node in "Forum administration"
+    And I follow "Announcements"
+    And I navigate to "Edit settings" in current page administration
     And I expand all fieldsets
     And I set the field "id_visible" to "0"
     And I press "Save and return to course"
@@ -56,7 +59,7 @@ Feature: The search forums block allows users to search for forum posts
   Scenario: Use the search forum block in a course and search for posts
     Given I log in as "teacher1"
     And I follow "Course 1"
-    And I add a new topic to "News forum" forum with:
+    And I add a new topic to "Announcements" forum with:
       | Subject | My subject |
       | Message | My message |
     And I log out

@@ -555,8 +555,10 @@ class core_formslib_testcase extends advanced_testcase {
      * MDL-52873
      */
     public function test_multiple_modgrade_fields() {
+        global $CFG;
         $this->resetAfterTest(true);
 
+        $CFG->theme = 'clean';
         $form = new formslib_multiple_modgrade_form();
         ob_start();
         $form->display();
@@ -579,6 +581,37 @@ class core_formslib_testcase extends advanced_testcase {
     }
 
     /**
+     * Test persistant freeze elements have different id's.
+     */
+    public function test_persistantrreeze_element() {
+        global $CFG;
+        $this->resetAfterTest(true);
+        $CFG->theme = 'clean';
+
+        $form = new formslib_persistantrreeze_element();
+        ob_start();
+        $form->display();
+        $html = ob_get_clean();
+
+        // Test advcheckbox id's.
+        $this->assertTag(array('id' => 'id_advcheckboxpersistant'), $html);
+        $this->assertTag(array('id' => 'id_advcheckboxpersistant_persistant'), $html);
+        $this->assertTag(array('id' => 'id_advcheckboxnotpersistant'), $html);
+        $this->assertNotTag(array('id' => 'id_advcheckboxnotpersistant_persistant'), $html);
+        $this->assertTag(array('id' => 'id_advcheckboxfrozen'), $html);
+        $this->assertTag(array('id' => 'id_advcheckboxfrozen_persistant'), $html);
+
+        // Check text element id's.
+        $this->assertTag(array('id' => 'id_textpersistant'), $html);
+        $this->assertTag(array('id' => 'id_textpersistant_persistant'), $html);
+        $this->assertTag(array('id' => 'id_textnotpersistant'), $html);
+        $this->assertNotTag(array('id' => 'id_textnotpersistant_persistant'), $html);
+        $this->assertTag(array('id' => 'id_textfrozen'), $html);
+        $this->assertNotTag(array('id' => 'id_textfrozen_persistant'), $html);
+
+    }
+
+    /**
      * Ensure a validation can run at least once per object. See MDL-56259.
      */
     public function test_multiple_validation() {
@@ -595,6 +628,23 @@ class core_formslib_testcase extends advanced_testcase {
         $form = new formslib_multiple_validation_form();
         $this->assertFalse($form->is_validated());
         $this->assertNull($form->get_data());
+    }
+
+    /**
+     * MDL-56233 - Tests mocking a form inside a namespace.
+     */
+    public function test_mock_submit() {
+        require_once(__DIR__.'/fixtures/namespaced_form.php');
+        \local_unittests\namespaced_form\exampleform::mock_submit(['title' => 'Mocked Value']);
+        $form = new \local_unittests\namespaced_form\exampleform();
+
+        // Here is the problem, this is the expected hidden field name.
+        $expected = '_qf__local_unittests_namespaced_form_exampleform';
+        self::assertArrayHasKey($expected, $_POST);
+
+        // This should work now, before it would fail.
+        self::assertTrue($form->is_submitted());
+        self::assertSame('Mocked Value', $form->get_data()->title);
     }
 }
 
@@ -882,11 +932,51 @@ class formslib_multiple_modgrade_form extends moodleform {
 }
 
 /**
+ * Used to test frozen elements get unique id attributes.
+ */
+class formslib_persistantrreeze_element extends moodleform {
+    public function definition() {
+        $mform = $this->_form;
+
+        // Create advanced checkbox.
+        // Persistant.
+        $advcheckboxpersistant = $mform->addElement('advcheckbox', 'advcheckboxpersistant', 'advcheckbox');
+        $mform->setType('advcheckboxpersistant', PARAM_BOOL);
+        $advcheckboxpersistant->setChecked(true);
+        $advcheckboxpersistant->freeze();
+        $advcheckboxpersistant->setPersistantFreeze(true);
+        // Frozen.
+        $advcheckboxfrozen = $mform->addElement('advcheckbox', 'advcheckboxfrozen', 'advcheckbox');
+        $mform->setType('advcheckboxfrozen', PARAM_BOOL);
+        $advcheckboxfrozen->setChecked(true);
+        $advcheckboxfrozen->freeze();
+        // Neither persistant nor Frozen.
+        $mform->addElement('advcheckbox', 'advcheckboxnotpersistant', 'advcheckbox');
+        $mform->setType('advcheckboxnotpersistant', PARAM_BOOL);
+
+        // Create text fields.
+        // Persistant.
+        $elpersistant = $mform->addElement('text', 'textpersistant', 'test', 'test');
+        $mform->setType('textpersistant', PARAM_TEXT);
+        $elpersistant->freeze();
+        $elpersistant->setPersistantFreeze(true);
+        // Frozen.
+        $elfrozen = $mform->addElement('text', 'textfrozen', 'test', 'test');
+        $mform->setType('textfrozen', PARAM_TEXT);
+        $elfrozen->freeze();
+        // Neither persistant nor Frozen.
+        $mform->addElement('text', 'textnotpersistant', 'test', 'test');
+        $mform->setType('textnotpersistant', PARAM_TEXT);
+    }
+}
+
+/**
  * Used to test that you can validate a form more than once. See MDL-56250.
  * @package    core_form
  * @author     Daniel Thee Roperto <daniel.roperto@catalyst-au.net>
  * @copyright  2016 Catalyst IT
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later */
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 class formslib_multiple_validation_form extends moodleform {
     /**
      * Simple definition, one text field which can have a number.

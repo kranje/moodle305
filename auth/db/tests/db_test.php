@@ -31,6 +31,9 @@ class auth_db_testcase extends advanced_testcase {
     /** @var string Original error log */
     protected $oldlog;
 
+    /** @var int The amount of users to create for the large user set deletion test  */
+    protected $largedeletionsetsize = 128;
+
     protected function init_auth_database() {
         global $DB, $CFG;
         require_once("$CFG->dirroot/auth/db/auth.php");
@@ -121,7 +124,9 @@ class auth_db_testcase extends advanced_testcase {
         set_config('table', $CFG->prefix.'auth_db_users', 'auth/db');
         set_config('fielduser', 'name', 'auth/db');
         set_config('fieldpass', 'pass', 'auth/db');
-
+        set_config('field_map_lastname', 'lastname', 'auth/db');
+        set_config('field_updatelocal_lastname', 'oncreate', 'auth/db');
+        set_config('field_lock_lastname', 'unlocked', 'auth/db');
         // Setu up field mappings.
 
         set_config('field_map_email', 'email', 'auth/db');
@@ -149,7 +154,7 @@ class auth_db_testcase extends advanced_testcase {
     public function test_plugin() {
         global $DB, $CFG;
 
-        $this->resetAfterTest(false);
+        $this->resetAfterTest(true);
 
         // NOTE: It is strongly discouraged to create new tables in advanced_testcase classes,
         //       but there is no other simple way to test ext database enrol sync, so let's
@@ -306,7 +311,6 @@ class auth_db_testcase extends advanced_testcase {
         $DB->update_record('auth_db_users', $user3);
         $this->assertTrue($auth->user_login('u3', 'heslo'));
 
-        require_once($CFG->libdir.'/password_compat/lib/password.php');
         set_config('passtype', 'saltedcrypt', 'auth/db');
         $auth->config->passtype = 'saltedcrypt';
         $user3->pass = password_hash('heslo', PASSWORD_BCRYPT);
@@ -416,60 +420,83 @@ class auth_db_testcase extends advanced_testcase {
         $extdbuser1 = (object)array('name'=>'u1', 'pass'=>'heslo', 'email'=>'u1@example.com');
         $extdbuser1->id = $DB->insert_record('auth_db_users', $extdbuser1);
 
-        // User with malicious data on the name.
+        // User with malicious data on the name (won't be imported).
         $extdbuser2 = (object)array('name'=>'user<script>alert(1);</script>xss', 'pass'=>'heslo', 'email'=>'xssuser@example.com');
         $extdbuser2->id = $DB->insert_record('auth_db_users', $extdbuser2);
 
+        $extdbuser3 = (object)array('name'=>'u3', 'pass'=>'heslo', 'email'=>'u3@example.com',
+                'lastname' => 'user<script>alert(1);</script>xss');
+        $extdbuser3->id = $DB->insert_record('auth_db_users', $extdbuser3);
         $trace = new null_progress_trace();
 
         // Let's test user sync make sure still works as expected..
         $auth->sync_users($trace, true);
-
-        // Get the user on moodle user table.
-        $user2 = $DB->get_record('user', array('email'=> $extdbuser2->email, 'auth'=>'db'));
-
-        // The malicious code should be sanitized.
-        $this->assertEquals($user2->username, 'userscriptalert1scriptxss');
-        $this->assertNotEquals($user2->username, $extdbuser2->name);
-
+        $this->assertDebuggingCalled("The property 'lastname' has invalid data and has been cleaned.");
         // User with correct data, should be equal to external db.
         $user1 = $DB->get_record('user', array('email'=> $extdbuser1->email, 'auth'=>'db'));
         $this->assertEquals($extdbuser1->name, $user1->username);
         $this->assertEquals($extdbuser1->email, $user1->email);
 
-        // Now, let's update the name.
-        $extdbuser2->name = 'user no xss anymore';
-        $DB->update_record('auth_db_users', $extdbuser2);
+        // Get the user on moodle user table.
+        $user2 = $DB->get_record('user', array('email'=> $extdbuser2->email, 'auth'=>'db'));
+        $user3 = $DB->get_record('user', array('email'=> $extdbuser3->email, 'auth'=>'db'));
 
-        // Run sync again to update the user data.
+        $this->assertEmpty($user2);
+        $this->assertEquals($extdbuser3->name, $user3->username);
+        $this->assertEquals('useralert(1);xss', $user3->lastname);
+
+        $this->cleanup_auth_database();
+    }
+
+    /**
+     * Testing the deletion of a user when there are many users in the external DB.
+     */
+    public function test_deleting_with_many_users() {
+        global $DB;
+
+        $this->resetAfterTest(true);
+        $this->preventResetByRollback();
+        $this->init_auth_database();
+        $auth = get_auth_plugin('db');
+        $auth->db_init();
+
+        // Set to delete from moodle when missing from DB.
+        set_config('removeuser', AUTH_REMOVEUSER_FULLDELETE, 'auth/db');
+        $auth->config->removeuser = AUTH_REMOVEUSER_FULLDELETE;
+
+        // Create users.
+        $users = [];
+        for ($i = 0; $i < $this->largedeletionsetsize; $i++) {
+            $user = (object)array('username' => "u$i", 'name' => "u$i", 'pass' => 'heslo', 'email' => "u$i@example.com");
+            $user->id  = $DB->insert_record('auth_db_users', $user);
+            $users[] = $user;
+        }
+
+        // Sync to moodle.
+        $trace = new null_progress_trace();
         $auth->sync_users($trace, true);
 
-        // The user information should be updated.
-        $user2 = $DB->get_record('user', array('username' => 'usernoxssanymore', 'auth' => 'db'));
-        // The spaces should be removed, as it's the username.
-        $this->assertEquals($user2->username, 'usernoxssanymore');
+        // Check user is there.
+        $user = array_shift($users);
+        $moodleuser = $DB->get_record('user', array('email' => $user->email, 'auth' => 'db'));
+        $this->assertNotNull($moodleuser);
+        $this->assertEquals($user->username, $moodleuser->username);
 
-        // Now let's test just the clean_data() method isolated.
-        // Testing PARAM_USERNAME, PARAM_NOTAGS, PARAM_RAW_TRIMMED and others.
-        $user3 = new stdClass();
-        $user3->firstname = 'John <script>alert(1)</script> Doe';
-        $user3->username = 'john%#&~%*_doe';
-        $user3->email = ' john@testing.com ';
-        $user3->deleted = 'no';
-        $user3->description = '<b>A description about myself.</b>';
-        $user3cleaned = $auth->clean_data($user3);
+        // Delete a user.
+        $DB->delete_records('auth_db_users', array('id' => $user->id));
 
-        // Expected results.
-        $this->assertEquals($user3cleaned->firstname, 'John alert(1) Doe');
-        $this->assertEquals($user3cleaned->email, 'john@testing.com');
-        $this->assertEquals($user3cleaned->deleted, 0);
-        $this->assertEquals($user3->description, '<b>A description about myself.</b>');
-        $this->assertEquals($user3->username, 'john_doe');
+        // Sync again.
+        $auth->sync_users($trace, true);
 
-        // Try to clean an invalid property (fullname).
-        $user3->fullname = 'John Doe';
-        $auth->clean_data($user3);
-        $this->assertDebuggingCalled("The property 'fullname' could not be cleaned.");
+        // Check user is no longer there.
+        $moodleuser = $DB->get_record('user', array('id' => $moodleuser->id));
+        $this->assertFalse($auth->user_login($user->username, 'heslo'));
+        $this->assertEquals(1, $moodleuser->deleted);
+
+        // Make sure it was the only user deleted.
+        $numberdeleted = $DB->count_records('user', array('deleted' => 1, 'auth' => 'db'));
+        $this->assertEquals(1, $numberdeleted);
+
         $this->cleanup_auth_database();
     }
 }

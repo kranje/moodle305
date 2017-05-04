@@ -135,8 +135,10 @@ class manager {
         global $DB;
 
         $record = self::record_from_adhoc_task($task);
-        // Schedule it immediately.
-        $record->nextruntime = time() - 1;
+        // Schedule it immediately if nextruntime not explicitly set.
+        if (!$task->get_next_run_time()) {
+            $record->nextruntime = time() - 1;
+        }
         $result = $DB->insert_record('task_adhoc', $record);
 
         return $result;
@@ -419,8 +421,16 @@ class manager {
 
         foreach ($records as $record) {
 
-            if ($lock = $cronlockfactory->get_lock('adhoc_' . $record->id, 10)) {
+            if ($lock = $cronlockfactory->get_lock('adhoc_' . $record->id, 0)) {
                 $classname = '\\' . $record->classname;
+
+                // Safety check, see if the task has been already processed by another cron run.
+                $record = $DB->get_record('task_adhoc', array('id' => $record->id));
+                if (!$record) {
+                    $lock->release();
+                    continue;
+                }
+
                 $task = self::adhoc_task_from_record($record);
                 // Safety check in case the task in the DB does not match a real class (maybe something was uninstalled).
                 if (!$task) {
@@ -470,7 +480,7 @@ class manager {
 
         foreach ($records as $record) {
 
-            if ($lock = $cronlockfactory->get_lock(($record->classname), 10)) {
+            if ($lock = $cronlockfactory->get_lock(($record->classname), 0)) {
                 $classname = '\\' . $record->classname;
                 $task = self::scheduled_task_from_record($record);
                 // Safety check in case the task in the DB does not match a real class (maybe something was uninstalled).

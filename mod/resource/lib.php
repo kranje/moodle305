@@ -213,10 +213,14 @@ function resource_get_coursemodule_info($coursemodule) {
         $info->icon ='i/invalid';
         return $info;
     }
+
+    // See if there is at least one file.
     $fs = get_file_storage();
-    $files = $fs->get_area_files($context->id, 'mod_resource', 'content', 0, 'sortorder DESC, id ASC', false); // TODO: this is not very efficient!!
+    $files = $DB->get_records_select('files', 'contextid = ? AND component = ? AND filearea = ? AND itemid = ? AND filename != ?',
+            array($context->id, 'mod_resource', 'content', 0, '.'), 'sortorder DESC, id ASC', '*', 0, 1);
     if (count($files) >= 1) {
-        $mainfile = reset($files);
+        $firstrecord = reset($files);
+        $mainfile = $fs->get_file_instance($firstrecord);
         $info->icon = file_file_icon($mainfile, 24);
         $resource->mainfile = $mainfile->get_filename();
     }
@@ -521,4 +525,18 @@ function resource_view($resource, $course, $cm, $context) {
     // Completion.
     $completion = new completion_info($course);
     $completion->set_module_viewed($cm);
+}
+
+/**
+ * Check if the module has any update that affects the current user since a given time.
+ *
+ * @param  cm_info $cm course module data
+ * @param  int $from the time to check updates from
+ * @param  array $filter  if we need to check only specific updates
+ * @return stdClass an object with the different type of areas indicating if they were updated or not
+ * @since Moodle 3.2
+ */
+function resource_check_updates_since(cm_info $cm, $from, $filter = array()) {
+    $updates = course_check_module_updates_since($cm, $from, array('content'), $filter);
+    return $updates;
 }
